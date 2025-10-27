@@ -1,0 +1,105 @@
+pricing calculator 
+https://calculator.aws/#/?nc2=pr
+
+IAAS > networking features, computers (virtual or on dedicated hardware), and data storage space,
+PAAS >This helps you be more efficient, as you don’t need to worry about resource procurement, capacity planning, software maintenance, patching,
+SAAS > SaaS are referring to third-party end-user applications.
+
+
+IAM (Identity and Access Management) 
+is a framework of policies, technologies, and processes that ensures the right individuals 
+have the right access to the right resources for the right reasons.
+
+Key Concepts
+Authentication (AuthN): "Who are you?" - Verifies identity
+
+Authorization (AuthZ): "What can you do?" - Verifies permissions
+
+Principle of Least Privilege: Grant minimum required permissions only
+
+Core Components
+Users - People
+
+Groups - User collections
+
+Roles - For services/apps (uses temporary credentials)
+
+Policies - JSON rules defining permissions
+
+Critical Best Practices
+✅ Never use Root account for daily tasks
+
+✅ Enable MFA on all privileged accounts
+
+✅ Use Roles for services (EC2, Lambda) - not stored keys
+
+✅ Apply Least Privilege - start with no permissions
+
+✅ Regular audit of users and policies
+
+Creating IAM User with S3 Full Access (Programmatic)
+Step 1: Navigate to IAM Console
+Go to AWS Management Console
+
+Search for "IAM" or find it under Services
+
+Click "Users" in left sidebar
+
+Click "Create user"
+
+Step 2: Set User Details
+User name: s3-admin-user (or your preferred name)
+
+Select AWS credential type:
+
+✅ Access key - Programmatic access (for CLI/SDK)
+
+☐ AWS Management Console access (optional)
+
+Step 3: Set Permissions
+Select "Attach existing policies directly"
+
+Search for S3 in policy filter
+
+Check AmazonS3FullAccess
+
+Alternative: For more restricted access, create custom policy
+
+Step 4: Review and Create
+Review settings
+
+Click "Create user"
+
+Step 5: Save Credentials ⚠️ IMPORTANT
+Download CSV file - this is your ONLY chance to save these
+
+File contains:
+
+Access Key ID
+
+Secret Access Key
+
+Store securely - treat like passwords
+
+Configure AWS CLI with New User
+
+# Configure CLI with new credentials
+aws configure
+
+# Enter when prompted:
+AWS Access Key ID: [PASTE_ACCESS_KEY_ID]
+AWS Secret Access Key: [PASTE_SECRET_ACCESS_KEY]
+Default region: us-east-1 (or your preferred region)
+Default output format: json
+
+
+Test the Configuration
+
+# List S3 buckets to verify access
+aws s3 ls
+
+# Create a test bucket
+aws s3 mb s3://your-test-bucket-name
+
+# List buckets again to confirm
+aws s3 ls
