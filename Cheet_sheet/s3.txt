@@ -1,0 +1,69 @@
+# Upload and make public in one command
+aws s3 cp test-file.txt s3://my-unique-bucket-name-12345/ --acl public-read
+S3 Core Concepts - Quick Reference
+1. Buckets & Objects
+Bucket: Container for objects (like a folder)
+
+Globally unique name across all AWS
+
+Regional scope (created in specific region)
+
+Object: The actual file/data stored
+
+Key: Full path/filename
+
+Version ID: Unique for each object version
+
+Metadata: System/user-defined data
+
+2. Storage Classes
+Frequent Access:
+
+S3 Standard: Default, >99.99% availability
+
+S3 Express-One Zone: Ultra-low latency (ms)
+
+Infrequent Access:
+
+S3 Standard-IA: Lower cost, rapid access
+
+S3 One Zone-IA: 20% cheaper, single AZ
+
+Archive:
+
+S3 Glacier Instant Retrieval: Archive with ms access
+
+S3 Glacier Flexible Retrieval: 1-5 min retrieval
+
+S3 Glacier Deep Archive: 12-48 hr retrieval, lowest cost
+
+3. Versioning
+Purpose: Protect against accidental deletes/overwrites
+
+When enabled: Every object gets unique VersionID
+
+States:
+
+Enabled: New versions protected
+
+Suspended: New versions not protected, existing preserved
+
+Cannot be disabled, only suspended
+
+4. Lifecycle Rules
+Automate moving objects between storage classes.
+
+Transition Rules:
+
+Move objects after X days
+
+Example: Standard → Standard-IA (after 30 days) → Glacier (after 90 days)
+
+Expiration Rules:
+
+Delete old versions/delete markers
+
+Example: Delete old versions after 365 days
+
+5. Bucket Policies
+JSON-based resource policies controlling bucket access.

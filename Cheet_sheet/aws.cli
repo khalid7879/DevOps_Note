@@ -1,0 +1,45 @@
+AWS CLI Installation & Configuration
+Step 1: Install AWS CLI
+
+# Using curl
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+# Verify installation
+aws --version
+
+Step 2: Get IAM Credentials
+Go to AWS Console → IAM → Users
+
+Select your user → Security credentials tab
+
+Under Access keys, click Create access key
+
+Choose CLI as use case
+
+Download CSV file with:
+
+Access Key ID
+
+Secret Access Key
+
+# Run configuration wizard
+aws configure
+
+# Enter details when prompted:
+AWS Access Key ID: [PASTE_ACCESS_KEY_ID]
+AWS Secret Access Key: [PASTE_SECRET_ACCESS_KEY]
+Default region name: us-east-1 (or your preferred region)
+Default output format: json (recommended)
+
+
+# Test configuration
+aws sts get-caller-identity
+
+# Should return your user ARN, account ID, and user ID
+{
+    "UserId": "AIDASAMPLEUSERID",
+    "Account": "123456789012",
+    "Arn": "arn:aws:iam::123456789012:user/your-username"
+}
