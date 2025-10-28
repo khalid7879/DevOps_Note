@@ -1,0 +1,5 @@
+EC2 Instances
+
+Guidelines:
+Learn about instance types, AMIs, key pairs, and security groups.
+Understand the steps to launch, connect to, and terminate an EC2 instance.

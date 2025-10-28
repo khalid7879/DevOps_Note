@@ -2,3 +2,5 @@ https://www.kerno.io/aws/elb
 
 https://www.youtube.com/watch?v=su4J6y9a7zw
 
+
+https://www.google.com/search?q=Elastic+Load+Balancer+(ELB)&rlz=1C1CHBF_enBD1069BD1069&sourceid=chrome&ie=UTF-8#fpstate=ive&vld=cid:41a8fb94,vid:Wjc_ka1W54g,st:0

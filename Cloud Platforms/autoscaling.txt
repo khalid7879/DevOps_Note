@@ -1,0 +1,4 @@
+https://www.google.com/search?q=Understand+scaling+policies+and+launch+configurations%2Ftemplates.+Learn+how+to+set+up+an+Auto+Scaling+group+with+EC2+instances.&rlz=1C1CHBF_enBD1069BD1069&sourceid=chrome&ie=UTF-8#fpstate=ive&vld=cid:6134b56e,vid:1dLR1m8XYTM,st:0
+
+https://youtu.be/1dLR1m8XYTM
+
