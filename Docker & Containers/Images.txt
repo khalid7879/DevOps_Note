@@ -62,4 +62,15 @@ docker run --name my-container my-app:latest
 docker run --rm my-app:latest
 
 # Run with interactive terminal
-docker run -it my-app:latest
+docker run -it my-app:latestß
+
+DB run
+
+"docker run -d \
+  --name mysql-db \
+  --network custom_bridge \
+  -e MYSQL_ROOT_PASSWORD=root \
+  -e MYSQL_DATABASE=attendance_db \ß
+  -p 3306:3306 \
+  mysql:latest"
+
