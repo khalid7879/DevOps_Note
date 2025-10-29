@@ -1,0 +1,65 @@
+# Build the image
+
+# Basic build command
+docker build -t my-app:latest .
+
+# Build with specific Dockerfile
+docker build -t my-app:latest -f Dockerfile.dev .
+
+# Build with build arguments
+docker build -t my-app:latest --build-arg ENV=production .
+
+# Build without cache
+docker build -t my-app:latest --no-cache .
+
+docker build -t my-web-app:1.0 .
+
+# Run the container
+docker run -d -p 80:80 --name web-server my-web-app:1.0
+
+# Check running containers
+docker ps
+
+# View logs
+docker logs web-server
+
+# Stop container
+docker stop web-server
+
+# Remove container
+docker rm web-server
+
+# Development setup
+docker build -t my-app:dev .
+docker run -p 3000:3000 -v $(pwd):/app my-app:dev
+
+# Production-like setup
+docker build -t my-app:prod .
+docker run -d -p 80:80 --name my-app-prod my-app:prod
+
+# With environment file
+docker run --env-file .env -p 8080:8080 my-app:latest
+
+# Basic run command
+docker run my-app:latest
+
+# Run in detached mode
+docker run -d my-app:latest
+
+# Run with port mapping
+docker run -p 8080:80 my-app:latest
+
+# Run with volume mounting
+docker run -v /host/path:/container/path my-app:latest
+
+# Run with environment variables
+docker run -e ENV=production my-app:latest
+
+# Run with name
+docker run --name my-container my-app:latest
+
+# Run and remove container after exit
+docker run --rm my-app:latest
+
+# Run with interactive terminal
+docker run -it my-app:latest
