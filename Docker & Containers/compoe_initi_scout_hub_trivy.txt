@@ -1,0 +1,45 @@
+docker-compose down
+docker stop $(docker ps -aq)
+
+docker images
+docker rmi $(docker images -q)
+https://docs.docker.com/engine/install/ubuntu/
+https://docs.docker.com/engine/install/ubuntu/
+docker compose up --build -d
+  --restart unless-stopped \
+no → Default. Don’t restart the container automatically.
+
+always → Always restart on crash or system reboot.
+
+unless-stopped → Restart unless you manually stop it. (Recommended)
+
+on-failure → Restart only if the container exits with a non-zero code.
+
+docker compose up -d --force-recreate
+
+Docker Scout
+-------------
+docker scout cve <image-name> --only-severity critical,high
+docker scout disable
+docker scout enable
+
+docker scout policy <image-name>
+
+# Scan local image (without pulling)
+
+docker scout cve <image-name> --local
+docker scout recommendations <image-name>
+
+## Example Workflow
+
+# Build your image
+docker build -t my-app:v1 .
+
+# Scan for vulnerabilities
+docker scout cve my-app:v1
+
+# Check if it meets your security policy
+docker scout policy my-app:v1
+
+# Compare with previous version
+docker scout compare my-app:v1 my-app:v2

@@ -1,0 +1,12 @@
+docker volume create my_volume
+docker volume ls
+docker volume inspect my_volume
+docker run -d -v my_volume:/data --name my_container ubuntu
+docker exec -it my_container bash
+docker volume rm my_volume
+docker volume prune
+docker run -d -v my_volume:/path/in/container --name new_container ubuntu
+docker exec -it new_container bash
+docker exec -it new_container ls /path/in/container
+
+docker stop $(docker ps -aq) && docker system prune -a --volumes -f  
