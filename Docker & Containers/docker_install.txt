@@ -22,3 +22,6 @@ $cat /etc/group
 $ docker ps (permission denied)
 $ sudo reboot
 $ docker run hello-world
+
+
+containder.d work behind docker

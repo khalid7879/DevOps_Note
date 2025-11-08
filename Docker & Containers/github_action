@@ -1,3 +1,46 @@
  Docker compose -f compose.yml
- 
- 
+ https://github.com/khalid7879/docker/blob/main/.github/workflows/main.yml
+
+ https://github.com/bongodev/flask-student-attendance-app
+
+
+ github repo setting secret and variable 
+
+ docker hub >setting >personal access tokens >
+
+ user>host>pemkye
+
+ Blue green deployment
+ -------------------------
+ https://github.com/bongodev/blue-green/blob/main/.github/workflows/main.yml
+
+install ngnix
+enable it
+
+
+cd/etc/nginx/conf.d
+
+upstream flask app{
+
+server localhost: 5000 # Placeholder (this gets replaced dynamically)
+
+
+}
+
+
+server{
+
+listen 80; Make sure its on port 80 ,not 5000 or 5001
+
+location /{
+
+
+proxy pass http://flask_app: # This points to localhost: or 5001
+
+proxy_set_header Host $host;
+
+proxy_set_header X-Real-IP $remote_addr;
+
+}
+}
+
