@@ -1,0 +1,113 @@
+Master >slave
+Unit test 
+analytiscs
+Integration test
+
+Master >agents > deployment server
+master >own machine >private key
+slave >public key
+
+sudo apt update
+sudo apt install fontconfig openjdk-21-jre
+java -version
+
+sudo wget -O /etc/apt/keyrings/jenkins-keyring.asc \
+  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+echo "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc]" \
+  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt update
+sudo apt install jenkins
+
+sudo systemctl status jenkins
+
+Pipeline
+
+https://crontab.guru/
+
+
+pipeline {
+    agent any
+
+    stages {
+        stage('Pull') {
+            steps {
+                echo "GitHub Pull"
+            }
+        }
+
+        stage('Build') {
+            steps {
+                echo "GitHub Build"
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo "Running Tests"
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo "Deploying Application"
+            }
+        }
+    }
+}
+
+
+ssh-keygen
+
+cd .ssh
+ssh- i ided3434 ubuntu@ec2......
+
+Agents 
+
+manager jenkins
+new agent >ssh key > private key>
+
+pipeline {
+    agent {
+        node {
+            label 'dev'
+        }
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                echo 'Cloning main branch from GitHub...'
+                git branch: 'main', url: 'https://github.com/bongodev/flask-student-attendance-app.git'
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                echo 'Building Docker image...'
+                sh '''
+                    docker build -t flask-student-app:latest .
+                '''
+            }
+        }
+
+        stage('Deploy with Docker Compose') {
+            steps {
+                echo 'Redeploying application with Docker Compose...'
+                sh '''
+                    docker compose down
+                    docker compose up -d --build
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Deployment completed successfully!'
+        }
+        failure {
+            echo '❌ Deployment failed. Please review the build logs.'
+        }
+    }
+}
