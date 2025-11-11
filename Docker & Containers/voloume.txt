@@ -10,3 +10,14 @@ docker exec -it new_container bash
 docker exec -it new_container ls /path/in/container
 
 docker stop $(docker ps -aq) && docker system prune -a --volumes -f  
+
+
+docker volume inspect $(docker volume ls -q)
+
+docker volume inspect my_volume
+
+# Get just the mountpoint
+docker volume inspect my_volume --format '{{ .Mountpoint }}'
+
+# Get name and mountpoint
+docker volume inspect my_volume --format 'Name: {{ .Name }}, Path: {{ .Mountpoint }}'

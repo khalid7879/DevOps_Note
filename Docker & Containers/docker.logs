@@ -1,0 +1,9 @@
+docker logs [OPTIONS] CONTAINER
+docker logs -f my_web_app
+docker logs --tail 20 -f my_web_app
+docker logs --tail 50 -t my_web_app
+docker logs --since 30m my_web_app
+docker logs --since 1h --until 10m my_web_app
+
+docker system df
+docker system prune -a
