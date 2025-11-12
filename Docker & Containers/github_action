@@ -1,4 +1,54 @@
- Docker compose -f compose.yml
+\\git to local pc\\
+echo "# ABC_TEST" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/khalid7879/ABC_TEST.git
+git push -u origin main
+
+git remote add origin https://github.com/khalid7879/ABC_TEST.git
+git branch -M main
+git push -u origin main
+
+\\Github action\\
+.github/workflows/main.yml
+
+\\login to dockerhub and push\\
+
+
+
+\\Access to server and deploy\\
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Docker compose -f compose.yml
  https://github.com/khalid7879/docker/blob/main/.github/workflows/main.yml
 
  https://github.com/bongodev/flask-student-attendance-app
