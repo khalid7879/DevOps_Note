@@ -1,0 +1,2 @@
+git reset --hard id
+git push --force 
