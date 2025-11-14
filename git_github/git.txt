@@ -1,2 +1,3 @@
-git reset --hard id
-git push --force 
+git reset --hard <commit-hash>
+git push origin HEAD --force
+
