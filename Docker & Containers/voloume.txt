@@ -21,3 +21,35 @@ docker volume inspect my_volume --format '{{ .Mountpoint }}'
 
 # Get name and mountpoint
 docker volume inspect my_volume --format 'Name: {{ .Name }}, Path: {{ .Mountpoint }}'
+
+
+## Automated Backup with Cron
+
+#!/bin/bash
+
+# Configuration
+CONTAINER="my_app"
+VOLUME_PATH="/app/data"
+BACKUP_DIR="/opt/backups"
+RETENTION_DAYS=7
+
+# Create timestamp
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+# Create backup
+docker run --rm \
+  --volumes-from $CONTAINER \
+  -v $BACKUP_DIR:/backup \
+  alpine tar czf /backup/backup_${TIMESTAMP}.tar.gz $VOLUME_PATH
+
+# Clean old backups
+find $BACKUP_DIR -name "backup_*.tar.gz" -mtime +$RETENTION_DAYS -delete
+
+mysql
+
+# Backup
+docker exec mysql_container mysqldump -u username -p password database_name > backup.sql
+
+# Restore
+docker exec -i mysql_container mysql -u username -p password database_name < backup.sql
+

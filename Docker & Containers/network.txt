@@ -7,3 +7,5 @@ docker network create custom bridge
 Ip a |grep
 https://github.com/khalid7879/netshoot
 ss -ltup
+
+docker logs
