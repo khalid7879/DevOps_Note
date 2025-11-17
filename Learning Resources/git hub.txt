@@ -3,3 +3,6 @@ https://github.com/offen/docker-volume-backup/
 ##docker container backup
 https://www.youtube.com/watch?v=ZEy8iFbgbPA
 
+https://www.youtube.com/watch?v=JoA6Bezgk1c
+
+https://github.com/christianlempa/scripts

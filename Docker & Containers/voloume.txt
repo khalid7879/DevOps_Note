@@ -53,3 +53,33 @@ docker exec mysql_container mysqldump -u username -p password database_name > ba
 # Restore
 docker exec -i mysql_container mysql -u username -p password database_name < backup.sql
 
+https://github.com/christianlempa/scripts
+
+## 1. Check the original container's mount points
+# Inspect the container's mounted volumes
+docker inspect <container> | grep -A 5 "Mounts"
+
+# Or more specifically:
+docker inspect <container> --format='{{range .Mounts}}{{.Destination}}{{"\n"}}{{end}}'
+
+## 2. Check the container's working directory
+# Get the working directory
+docker inspect <container> --format='{{.Config.WorkingDir}}'
+
+# Get the complete container config
+docker inspect <container> --format='{{json .Config}}' | jq .
+
+## 3. Backup Command
+
+# Backup MySQL data
+docker run --rm --volumes-from mysql-container -v $(pwd):/backup busybox tar cvfz /backup/backup.tar.gz /var/lib/mysql
+
+# Backup PostgreSQL data  
+docker run --rm --volumes-from postgres-container -v $(pwd):/backup busybox tar cvfz /backup/backup.tar.gz /var/lib/postgresql/data
+
+# If unsure, list volumes from the source container first
+docker run --rm --volumes-from <container> busybox ls -la /
+
+duplicati
+
+https://www.youtube.com/watch?v=rchFalToyRA&t=164s
