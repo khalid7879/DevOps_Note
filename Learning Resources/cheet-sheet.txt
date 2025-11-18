@@ -1,3 +1,8 @@
 https://github.com/ChristianLempa/cheat-sheets/blob/main/tools/docker.md
 
+duplicati
+
+https://www.youtube.com/watch?v=rchFalToyRA&t=164s
+
+
 
