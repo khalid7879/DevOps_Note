@@ -1,0 +1,19 @@
+version: "2.1"
+services:
+  duplicati:
+    image: lscr.io/linuxserver/duplicati
+    container_name: duplicati
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=Asia/Dhaka
+      - SETTINGS_ENCRYPTION_KEY=YourStrongKeyHere
+    volumes:
+      - /mnt/filesync/duplicati/config:/config
+      - /root/bc:/backups
+      - /var/lib/docker/volumes/db_data/_data:/source
+    ports:
+      - 8270:8200
+    restart: unless-stopped
+
+    Compose file for duplicati
