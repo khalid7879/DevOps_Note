@@ -1,0 +1,9 @@
+#IASS
+
+Hahicorp
+https://developer.hashicorp.com/terraform/install
+
+docker scout cves id/name
+docker scout recommendations rupy7879/php-web:latest
+docker scout recommenquickview dations rupy7879/php-web:latest
+
