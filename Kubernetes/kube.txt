@@ -1,3 +1,13 @@
 K8S
+https://kubernetes.io/docs/home/
 
 minikube
+
+cluster >
+Master
+kubectl >scheluder ,ETCD >container manager >api server
+
+Worker node
+kubectl >POD >Proxy server
+crictl
+kubectl apply -f 
