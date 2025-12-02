@@ -1,7 +1,8 @@
 K8S
 https://kubernetes.io/docs/home/
 
-minikube
+minikube workstation
+
 
 cluster >
 Master
