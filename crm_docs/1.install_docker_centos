@@ -1,0 +1,53 @@
+✅ STEP 1 — Ensure your repos are fixed (critical for EOL CentOS 7)
+
+You already did this, but run again to be safe:
+
+sudo sed -i 's|mirror.centos.org|vault.centos.org|g' /etc/yum.repos.d/*.repo
+sudo sed -i 's|mirrorlist=|#mirrorlist=|g' /etc/yum.repos.d/*.repo
+sudo sed -i 's|#baseurl=|baseurl=|g' /etc/yum.repos.d/*.repo
+
+
+Then:
+
+sudo yum clean all
+sudo yum makecache
+
+✅ STEP 2 — Install yum-utils
+sudo yum install -y yum-utils
+
+✅ STEP 3 — Add Docker Repository
+sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+⚠️ STEP 4 — FIX: Install a specific Docker version
+
+Run this:
+
+sudo yum install -y docker-ce-20.10.24 docker-ce-cli-20.10.24 containerd.io
+
+
+If containerd.io version mismatch occurs, use:
+
+sudo yum install -y containerd.io-1.6.20
+sudo yum install -y docker-ce-20.10.24 docker-ce-cli-20.10.24
+
+✅ STEP 5 — Start Docker
+sudo systemctl enable docker
+sudo systemctl start docker
+sudo systemctl status docker
+
+Docker Compose Installation (CentOS 7.9)
+
+We’ll deploy the standalone binary, which is the recommended method for CentOS 7 and EOL systems.
+
+Step 1 — Download Docker Compose (v2.x stable)
+
+(Current stable: v2.24.6)
+
+sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.6/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+
+Step 2 — Apply executable permission
+sudo chmod +x /usr/local/bin/docker-compose
+
+Step 3 — Validate installation
+docker-compose --version
+
