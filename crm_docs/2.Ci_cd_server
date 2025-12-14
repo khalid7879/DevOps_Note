@@ -1,0 +1,89 @@
+1. Create SSH Key on Ubuntu Server (if not already)
+
+$ ssh-keygen -t ed25519 -C "github-actions-key"
+
+2. Copy Public Key to GitHub
+
+On the Ubuntu server:
+bash
+CopyEdit
+cat ~/.ssh/id_ed25519.pub
+
+Copy the output.
+Go to GitHub:
+Repo → Settings → Deploy Keys
+Add a new key:
+Title: "Ubuntu Server Key"
+Paste the public key
+✅ Check "Allow write access" (if needed)
+Click "Add key"
+
+3. Add the Private Key to GitHub Secrets
+
+On your Ubuntu server:
+bash
+CopyEdit
+cat ~/.ssh/id_ed25519
+Copy the private key.
+Go to GitHub Repo → Settings → Secrets and variables → Actions → New repository secret:
+Name: SSH_PRIVATE_KEY
+Value: paste private key
+
+4. Enable SSH Access to the Server
+
+Ensure the server allows SSH and GitHub Actions IPs if you have a firewall (e.g. open port 22).
+
+5. Create a GitHub Actions Workflow
+
+Create this file in your repo: .github/workflows/deploy.yml
+
+CopyEdit
+name: CI/CD Deployment
+
+on:
+  push:
+    branches:
+      - main  # Or your deployment branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+        ssh-keyscan -H YOUR.SERVER.IP >> ~/.ssh/known_hosts
+
+    - name: Deploy to Server
+      run: |
+        ssh -i ~/.ssh/id_ed25519 USER@YOUR.SERVER.IP << 'EOF'
+          cd /path/to/your/app
+          git pull origin main
+          # Add deployment steps here
+          # e.g., npm install, composer install, restart services, etc.
+        EOF
+Replace:
+YOUR.SERVER.IP → Your Ubuntu server IP
+USER → Ubuntu user (ubuntu, root, etc.)
+/path/to/your/app → Location of your app
+
+6. Initial Setup on Server
+
+Make sure your project is already cloned on the Ubuntu server and has access to the 
+GitHub repo:
+bash
+CopyEdit
+git clone git@github.com:your-username/your-repo.git
+Or pull the latest changes inside your project folder manually once to ensure SSH access 
+works.
+
+
+
+
+
