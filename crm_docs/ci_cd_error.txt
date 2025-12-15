@@ -1,0 +1,47 @@
+The Only Viable Resolution (Authoritative Path)
+
+Step 1: Generate a GitHub-Specific Deploy Key
+
+On the QC server (114.130.69.249):
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_github_qc -C "qc-deploy-114.130.69.249"
+No passphrase. This is a machine identity.
+
+Step 2: Register the Public Key in GitHub
+This is non-negotiable.
+GitHub Repo → Settings → Deploy Keys
+Add new key
+Paste:
+cat ~/.ssh/id_ed25519_github_qc.pub
+
+Enable Read access
+
+Save
+
+This step establishes trust between GitHub and the server.
+
+Step 3: Force SSH to Use the Correct Key
+
+Create/update SSH config on the server:
+
+vi ~/.ssh/config
+Add exactly:
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_github_qc
+
+  Then lock it down:
+
+chmod 600 ~/.ssh/config
+This removes key ambiguity.
+
+Step 4: Trust GitHub’s Host Key
+ssh-keyscan github.com >> ~/.ssh/known_hosts
+chmod 600 ~/.ssh/known_hosts
+
+Re-Run the Control Check (This Is the Gate)
+ssh -T git@github.com
+Success state:
+Hi <org-or-user>! You've successfully authenticated, but GitHub does not provide shell access.
+
+Only after this passes should you proceed.
