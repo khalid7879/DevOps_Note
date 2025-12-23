@@ -1,0 +1,236 @@
+## On old server (114.130.69.200):
+
+***docker inspect saas_crm_ihelp_db
+
+Find the output 
+
+"Mounts": [ { "Type": "volume", "Name": "saas-crm-ihelp_saas_crm_ihelp_db_data", "Source": "/var/lib/docker/volumes/saas-crm-ihelp_saas_crm_ihelp_db_data/_data", "Destination": "/var/lib/mysql", "Driver": "local", "Mode": "z", "RW": true, "Propagation": "" } ],
+
+***docker inspect saas_crm_ihelp
+
+"Config": {
+            "Hostname": "5643780ef506",
+            "Domainname": "",
+            "User": "",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "ExposedPorts": {
+                "9000/tcp": {}
+            },
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "PHPIZE_DEPS=autoconf \t\tdpkg-dev \t\tfile \t\tg++ \t\tgcc \t\tlibc-dev \t\tmake \t\tpkg-config \t\tre2c",
+                "PHP_INI_DIR=/usr/local/etc/php",
+                "PHP_CFLAGS=-fstack-protector-strong -fpic -fpie -O2 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64",
+                "PHP_CPPFLAGS=-fstack-protector-strong -fpic -fpie -O2 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64",
+                "PHP_LDFLAGS=-Wl,-O1 -pie",
+                "GPG_KEYS=39B641343D8C104B2B146DC3F9C39DC0B9698544 E60913E4DF209907D8E30D96659A97C9CF2A795A 1198C0117593497A5EC5C199286AF1F9897469DC",
+                "PHP_VERSION=8.2.29",
+                "PHP_URL=https://www.php.net/distributions/php-8.2.29.tar.xz",
+                "PHP_ASC_URL=https://www.php.net/distributions/php-8.2.29.tar.xz.asc",
+                "PHP_SHA256=475f991afd2d5b901fb410be407d929bc00c46285d3f439a02c59e8b6fe3589c"
+            ],
+            "Cmd": [
+                "php-fpm"
+            ],
+            "Image": "saas-crm-ihelp-app",
+            "Volumes": null,
+            "WorkingDir": "/var/www",
+            "Entrypoint": [
+                "docker-php-entrypoint"
+            ],
+            "OnBuild": null,
+            "Labels": {
+                "com.docker.compose.config-hash": "4940c80e891f5fe60574774370a4eb3c7533ed9bdf027a2daf4fa353a8b9f708",
+                "com.docker.compose.container-number": "1",
+                "com.docker.compose.depends_on": "db:service_started:false",
+                "com.docker.compose.image": "sha256:99071f56dbaaf04e4f7345c7777f060920d1c2cc00d48dd106d8844a440fd067",
+                "com.docker.compose.oneoff": "False",
+                "com.docker.compose.project": "saas-crm-ihelp",
+                "com.docker.compose.project.config_files": "/var/www/html/saas-crm-ihelp/docker-compose.yml",
+                "com.docker.compose.project.working_dir": "/var/www/html/saas-crm-ihelp",
+                "com.docker.compose.replace": "8f881dca829a1b4d290f1d45cb0a18da10614aba09bc9e357ffe094da81506f6",
+                "com.docker.compose.service": "app",
+                "com.docker.compose.version": "2.27.0"
+            },
+            "StopSignal": "SIGQUIT"
+        },
+
+
+***docker inspect saas_crm_ihelp_webserver
+
+"Mounts": [
+            {
+                "Type": "bind",
+                "Source": "/var/www/html/saas-crm-ihelp",
+                "Destination": "/var/www",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/var/www/html/saas-crm-ihelp/nginx/conf.d",
+                "Destination": "/etc/nginx/conf.d",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": "rprivate"
+            }
+        ],
+
+🔍 What Your docker inspect Tells Us (IMPORTANT)
+1️⃣ MySQL (DATA – Docker Volume)
+Volume name:
+saas-crm-ihelp_saas_crm_ihelp_db_data
+
+Host path:
+ /var/lib/docker/volumes/saas-crm-ihelp_saas_crm_ihelp_db_data/_data
+
+
+✅ This is where ALL database data lives
+
+2️⃣ App Container (saas_crm_ihelp)
+
+❌ NO volume
+
+❌ NO bind mount
+
+✅ Code is baked into Docker image: saas-crm-ihelp-app
+
+➡️ So:
+
+No app files to copy
+
+Just need the Docker image
+
+3️⃣ Nginx Webserver (saas_crm_ihelp_webserver)
+Bind mounts (VERY IMPORTANT)
+/var/www/html/saas-crm-ihelp        → /var/www
+/var/www/html/saas-crm-ihelp/nginx/conf.d → /etc/nginx/conf.d
+
+✅ These directories MUST be copied manually
+They contain:
+
+Application source code
+
+Nginx configs
+
+docker-compose.yml
+
+✅ FINAL MIGRATION PLAN (SAFE & CORRECT)
+
+We will migrate 3 things:
+
+🗄️ MySQL volume
+
+📁 App + Nginx bind-mounted files
+
+🐳 Docker images
+
+## Stop Write Operations (OLD SERVER)
+
+On 114.130.69.200:
+
+docker stop saas_crm_ihelp
+docker stop saas_crm_ihelp_webserver
+
+
+***dump the database
+
+docker exec saas_crm_ihelp_db \
+bash -c 'mysqldump -u root -p "$NeverSharePassword?@2025#" \
+--all-databases \
+--single-transaction \
+--routines \
+--triggers \
+--events' \
+> /root/crm_mysql_dump.sql
+
+
+***verify the dump
+   ls -lh /root/crm_mysql_dump.sql
+
+***Backup volume
+docker run --rm \
+-v saas-crm-ihelp_saas_crm_ihelp_db_data:/volume \
+-v /root:/backup \
+alpine \
+tar czf /backup/mysql_volume_backup.tar.gz /volume
+
+***Backup App + Nginx Files (Bind Mounts)
+tar czf /root/app_nginx_backup.tar.gz \
+/var/www/html/saas-crm-ihelp
+
+***Backup Docker Images
+docker save \
+saas-crm-ihelp-app \
+nginx:latest \
+mysql:5.7 \
+phpmyadmin \
+-o /root/crm_images.tar
+
+***Transfer to NEW SERVER
+scp /root/mysql_volume_backup.tar.gz root@114.130.69.249:/root/
+scp /root/app_nginx_backup.tar.gz root@114.130.69.249:/root/
+scp /root/crm_images.tar root@114.130.69.249:/root/
+scp /root/crm_mysql_dump.sql root@114.130.69.249:/root/
+
+***Prepare NEW SERVER (114.130.69.249)
+curl -fsSL https://get.docker.com | sh
+systemctl enable docker
+systemctl start docker
+
+***Restore Docker Images
+docker load -i /root/crm_images.tar
+Verify:
+docker images
+
+***Restore App + Nginx Files
+mkdir -p /var/www/html
+tar xzf /root/app_nginx_backup.tar.gz -C /
+
+Verify:
+
+ls /var/www/html/saas-crm-ihelp
+
+***Restore MySQL Volume
+docker volume create saas-crm-ihelp_saas_crm_ihelp_db_data
+
+***Restore data
+docker run --rm \
+-v saas-crm-ihelp_saas_crm_ihelp_db_data:/volume \
+-v /root:/backup \
+alpine \
+tar xzf /backup/mysql_volume_backup.tar.gz -C /
+
+****Start Containers (Using docker-compose)
+
+Go to project directory:
+
+cd /var/www/html/saas-crm-ihelp
+
+Start DB first:-
+docker-compose up -d db
+
+
+Verify DB:
+
+docker exec -it saas_crm_ihelp_db mysql -u root -p
+SHOW DATABASES;
+
+****Restore from Dump (ONLY if needed)
+docker exec -i saas_crm_ihelp_db \
+mysql -u root -p < /root/crm_mysql_dump.sql
+
+Then
+
+docker-compose up -d 
+
+
+
+
+

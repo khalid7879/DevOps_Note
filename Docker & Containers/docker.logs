@@ -7,3 +7,6 @@ docker logs --since 1h --until 10m my_web_app
 
 docker system df
 docker system prune -a
+
+docker-compose build --no-cache 2>&1 | tee build.log
+

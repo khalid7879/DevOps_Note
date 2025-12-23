@@ -49,5 +49,4 @@ Step 2 — Apply executable permission
 sudo chmod +x /usr/local/bin/docker-compose
 
 Step 3 — Validate installation
-docker-compose --version
 
