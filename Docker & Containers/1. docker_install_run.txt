@@ -1,0 +1,27 @@
+Docker Install
+-------------------
+sudo apt update
+sudo apt install docker.io
+sudo systemctl start docker
+sudo systemctl enable docker
+docker  --version
+docker ps
+sudo usermod -aG docker username
+newgrp docker
+
+docker pull
+docker run -d -e mysql
+docker run -p -d -e mysql
+
+docker run hello-world
+$ docker ps (permission denied)
+It doesn’t work in AWS:
+A docker group has been created $ cat/etc/group
+$ sudo usermod -aG docker $USER
+$cat /etc/group
+$ docker ps (permission denied)
+$ sudo reboot
+$ docker run hello-world
+
+
+containder.d work behind docker

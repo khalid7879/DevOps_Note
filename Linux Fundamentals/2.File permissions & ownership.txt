@@ -1,0 +1,88 @@
+1. Understanding File Permissions (chmod)
+When you run ls -l, you’ll see a string like -rwxr-xr--. This tells you who can do what to 
+a file.
+
+The Breakdown:
+
+r = Read
+
+w = Write (Edit/Delete)
+
+x = Execute (Run a script or program)
+
+The Three Groups: The string is divided into three sets of three:
+
+User (Owner): The first three (rwx)
+
+Group: The middle three (r-x)
+
+Others: The last three (r--)
+
+How to Change Them
+You use the chmod (Change Mode) command. The easiest way is using numbers:
+
+4 = Read
+
+2 = Write
+
+1 = Execute
+
+Command,What it does
+chmod 777 file.txt,"Everyone can read, write, and execute (Dangerous!)"
+chmod 755 script.sh,You can do everything; Others can only read and run it.
+chmod 644 file.txt,You can read/write; Others can only read (Standard for files).
+
+Since "yes" usually means "all of the above," let's start with File Permissions, as they are the most important part of keeping your Linux system secure. Then, I'll give you those Pro Keyboard Shortcuts.
+
+1. Understanding File Permissions (chmod)
+When you run ls -l, you’ll see a string like -rwxr-xr--. This tells you who can do what to a file.
+
+The Breakdown:
+
+r = Read
+
+w = Write (Edit/Delete)
+
+x = Execute (Run a script or program)
+
+The Three Groups: The string is divided into three sets of three:
+
+User (Owner): The first three (rwx)
+
+Group: The middle three (r-x)
+
+Others: The last three (r--)
+
+How to Change Them
+You use the chmod (Change Mode) command. The easiest way is using numbers:
+
+4 = Read
+
+2 = Write
+
+1 = Execute
+
+You add them together to get the permission level. For example, 7 (4+2+1) means full access.
+
+Command	What it does
+chmod 777 file.txt	Everyone can read, write, and execute (Dangerous!)
+chmod 755 script.sh	You can do everything; Others can only read and run it.
+chmod 644 file.txt	You can read/write; Others can only read (Standard for files).
+
+Export to Sheets
+
+2. Pro Keyboard Shortcuts (Terminal Speed)
+These will save you hours of typing over time:
+
+Ctrl + C: Kill the current process (Stop a command that's stuck).
+
+Ctrl + L: Clear the screen (same as typing clear).
+
+Ctrl + A: Jump the cursor to the start of the line.
+
+Ctrl + E: Jump the cursor to the end of the line.
+
+Ctrl + U: Delete everything from the cursor back to the start of the line.
+
+Ctrl + R: Search your command history (just start typing a command you used yesterday).
+

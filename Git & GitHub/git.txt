@@ -1,3 +1,143 @@
-git reset --hard <commit-hash>
-git push origin HEAD --force
+🔹 1. Git Setup & Configuration
+git --version
+git config --global user.name "Your Name"
+git config --global user.email "you@email.com"
+git config --list
+git config --global core.editor nano
+git config --global init.defaultBranch main
 
+🔹 2. Repository Initialization & Cloning
+git init
+git init <project-name>
+git clone <repo-url>
+git clone -b <branch> <repo-url>
+
+🔹 3. Basic Workflow Commands
+git status
+git add file.txt
+git add .
+git commit -m "commit message"
+git commit -am "add & commit tracked files"
+git push
+git pull
+
+🔹 4. Branching & Merging
+git branch
+git branch <branch-name>
+git branch -d <branch-name>
+git checkout <branch-name>
+git checkout -b <branch-name>
+git switch <branch-name>
+git switch -c <branch-name>
+git merge <branch-name>
+git rebase <branch-name>
+
+🔹 5. Remote Repository (GitHub)
+git remote -v
+git remote add origin <repo-url>
+git remote remove origin
+git remote rename origin upstream
+git push -u origin main
+git fetch
+git fetch origin
+git pull origin main
+
+🔹 6. Log & History
+git log
+git log --oneline
+git log --graph --all
+git show <commit-id>
+git diff
+git diff --staged
+git blame file.txt
+
+🔹 7. Undo & Reset
+git restore file.txt
+git restore --staged file.txt
+git checkout -- file.txt
+git reset
+git reset --soft HEAD~1
+git reset --mixed HEAD~1
+git reset --hard HEAD~1
+git revert <commit-id>
+
+🔹 8. Stash (Temporary Save)
+git stash
+git stash list
+git stash apply
+git stash pop
+git stash drop
+git stash clear
+
+🔹 9. Tags & Releases
+git tag
+git tag v1.0
+git tag -a v1.0 -m "Release v1.0"
+git push origin v1.0
+git push origin --tags
+
+🔹 10. File Operations
+git rm file.txt
+git rm --cached file.txt
+git mv old.txt new.txt
+
+🔹 11. Cherry-Pick & Reflog
+git cherry-pick <commit-id>
+git reflog
+
+🔹 12. Submodules
+git submodule add <repo-url>
+git submodule init
+git submodule update
+git submodule update --remote
+
+🔹 13. GitHub Authentication
+ssh-keygen -t ed25519 -C "email"
+ssh-add ~/.ssh/id_ed25519
+git config --global credential.helper store
+
+🔹 14. GitHub CLI (gh) Commands
+gh auth login
+gh repo create
+gh repo clone <repo>
+gh pr create
+gh pr list
+gh pr merge
+gh issue create
+gh issue list
+
+🔹 15. Git Clean & Maintenance
+git clean -n
+git clean -f
+git gc
+git fsck
+
+🔹 16. Advanced / DevOps Useful Commands
+git worktree add ../new-branch branch-name
+git bisect start
+git bisect good
+git bisect bad
+git archive --format zip --output project.zip main
+
+🔹 17. CI/CD & Automation (GitHub Actions)
+git push origin main
+git tag v1.1
+git push origin v1.1
+
+🔹 18. Common Git Aliases (Optional)
+git config --global alias.st status
+git config --global alias.cm "commit -m"
+git config --global alias.br branch
+git config --global alias.co checkout
+
+🔹 19. Typical Git Flow
+git clone
+git checkout -b feature-branch
+git add .
+git commit -m "feature added"
+git push origin feature-branch
+
+🔹 20. Help
+git help
+git help commit
+git commit --help

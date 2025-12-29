@@ -1,0 +1,49 @@
+1. Managing Processes (Monitoring & Killing)
+Every process has a unique PID (Process ID).
+
+Command,       Purpose,                              When to use it
+ps aux,        Snapshot of all processes.,           When you want to find a specific PID using grep.
+top,           "Live, auto-updating list.",          To see which app is hogging your CPU right now.
+htop,          "Better, colorful version of top.",   For an interactive view (you can scroll and click).
+kill [PID],    Stops a process gracefully.,          When an app is acting up but still responding.
+kill -9 [PID], Forces a process to die.,             Use only as a last resort; it doesn't allow the app to save data.
+
+
+2. Systemctl (Managing Background Services)
+Most modern Linux distros use systemd, and systemctl is the tool used to talk to it. 
+Services (like your web server or firewall) usually end in .service.
+
+The Core Commands:
+sudo systemctl start [service]: Starts it immediately.
+
+sudo systemctl stop [service]: Shuts it down immediately.
+
+sudo systemctl restart [service]: Turns it off and back on.
+
+sudo systemctl status [service]: Shows if it's running, failed, and its recent logs.
+
+Boot Management (Persistence):
+sudo systemctl enable [service]: Makes the service start automatically when the computer boots up.
+
+sudo systemctl disable [service]: Prevents it from starting at boot.
+
+
+3. Understanding Service States
+When you run systemctl status, look for these keywords:
+
+Active (running): Everything is healthy.
+
+Active (exited): This was a task that ran once and finished successfully (normal for some setup tasks).
+
+Inactive (dead): The service is stopped.
+
+Failed: The service crashed or couldn't start. (Look at the logs below the status for the error message!)
+
+
+4. Reading the Logs (journalctl)
+If a service fails, systemctl won't tell you why. You need to check the "journal":
+
+journalctl -u [service]: Shows logs only for that specific service.
+
+journalctl -xe: Shows the most recent system errors (the -e jumps to the end).
+

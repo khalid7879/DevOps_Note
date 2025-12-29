@@ -1,5 +1,5 @@
 *** Foor docker containerd root MYSQL_ROOT_PASSWORD
 
-docker inspect saas_crm_ihelp_db | grep MYSQL_ROOT_PASSWORD
+docker inspect (containe name)saas_crm_ihelp_db | grep MYSQL_ROOT_PASSWORD
 
 

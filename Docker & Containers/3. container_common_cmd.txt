@@ -1,0 +1,61 @@
+## Container Visibility & Diagnostics
+
+docker ps – List running containers
+
+docker ps -a – List all containers
+
+docker logs CONTAINER – View logs
+
+docker logs -f CONTAINER – Stream logs in real time
+
+docker inspect CONTAINER – Detailed configuration view
+
+docker stats CONTAINER – Resource usage metrics
+
+docker top CONTAINER – Running processes inside container
+
+
+
+## Container Interaction
+
+docker exec -it CONTAINER bash – Access shell inside container
+
+docker attach CONTAINER – Attach to container STDOUT/STDIN
+
+docker cp CONTAINER:SRC DEST – Copy files from container
+
+docker cp SRC CONTAINER:DEST – Copy files to container
+
+
+
+## Container Cleanup
+
+docker rm CONTAINER – Remove stopped container
+
+docker rm -f CONTAINER – Force remove running container
+
+docker container prune – Remove all stopped containers
+
+
+
+## Container Metadata & Control
+
+docker rename OLD NEW – Rename container
+
+docker update CONTAINER – Update resource limits (CPU/memory)
+
+docker wait CONTAINER – Block until container exits
+
+docker diff CONTAINER – Track filesystem changes
+
+
+
+## High-Impact Operational Guidance
+
+Use --restart unless-stopped for resilience
+
+Always name containers for traceability
+
+Centralize logs before pruning
+
+Enforce cleanup cadence to control resource sprawl

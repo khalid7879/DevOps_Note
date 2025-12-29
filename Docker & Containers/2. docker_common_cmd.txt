@@ -1,0 +1,91 @@
+## Container Lifecycle Management
+
+docker run – Instantiate and execute a container from an image
+
+docker start – Re-activate a stopped container
+
+docker stop – Gracefully shut down a running container
+
+docker restart – Recycle a container to reset state
+
+docker rm – Decommission a container
+
+docker exec – Execute commands within a running container
+
+docker logs – Retrieve container logs for observability
+
+## Image Management
+
+docker images – Inventory locally available images
+
+docker pull – Fetch images from a registry
+
+docker build – Generate an image from a Dockerfile
+
+docker tag – Apply versioning or repository tags
+
+docker rmi – Retire unused images
+
+docker push – Publish images to a registry
+
+## Container Monitoring & Visibility
+
+docker ps – View active containers
+
+docker ps -a – View all containers (active + inactive)
+
+docker stats – Real-time resource utilization
+
+docker inspect – Deep-dive configuration and metadata
+
+## Networking Commands
+
+docker network ls – Review available networks
+
+docker network create – Provision a custom network
+
+docker network inspect – Validate network configuration
+
+docker network rm – Decommission a network
+
+## Volume & Data Management
+
+docker volume ls – List data volumes
+
+docker volume create – Create a persistent volume
+
+docker volume inspect – Review volume metadata
+
+docker volume rm – Remove a volume
+
+## System & Housekeeping
+
+docker info – Platform-level environment summary
+
+docker version – Client and server version validation
+
+docker system df – Disk utilization overview
+
+docker system prune – Clean up unused resources
+
+Docker Compose (Multi-Container Orchestration)
+
+docker-compose up – Deploy defined services
+
+docker-compose down – Tear down services
+
+docker-compose ps – Service status overview
+
+docker-compose logs – Aggregate service logs
+
+docker-compose build – Build images defined in compose
+
+## Strategic Best Practices
+
+Standardize image tagging for release governance
+
+Use volumes for stateful workloads
+
+Leverage .dockerignore to optimize build efficiency
+
+Apply docker-compose for environment parity (dev → prod)

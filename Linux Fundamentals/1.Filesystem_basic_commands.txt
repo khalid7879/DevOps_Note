@@ -1,0 +1,63 @@
+1. The Linux Filesystem Hierarchy
+
+Unlike Windows, which uses drive letters ($C:$, $D:$), 
+Linux uses a single unified tree structure starting at the Root directory(/)
+>>./bin & /usr/bin: Essential command binaries (like ls and cd)
+>>./etc: Configuration files for the system.
+>>/home: Personal folders for users (e.g., /home/username).
+>>/root: The home directory for the system administrator (root user).
+>>/tmp: Temporary files deleted on reboot.
+>>/var: Variable data, like system logs and databases.
+
+2. Navigation Commands
+These are your "movement" tools to find your way around the tree.
+
+Command,                 Action,                                        Example
+pwd,                     Print Working Directory (Where am I?),         pwd
+ls,                      List files and folders,ls -l (detailed list)
+cd,                      Change Directory,cd /etc
+cd ..,                   Move up one level,                             cd ..
+cd ~,                    Go to your home directory,                     cd ~
+
+
+3. File & Directory Operations
+Tools for creating, moving, and destroying data.
+
+mkdir [name]: Create a new directory.
+
+touch [file]: Create an empty file.
+
+cp [source] [dest]: Copy files or folders. (Use -r for folders).
+
+mv [source] [dest]: Move or Rename a file.
+
+rm [file]: Remove (delete) a file.
+
+Warning: rm -rf deletes folders permanently without a "Trash bin." Use with caution!
+
+
+4. Reading & Searching Files
+You don't always need to open a full editor to see what's inside a file.
+
+cat [file]: Dumps the entire content of a file into the terminal.
+
+head / tail: Shows the first or last 10 lines of a file.
+
+grep "word" [file]: Searches for a specific string inside a file.
+
+find: Locates files within a directory tree based on name or type.
+
+Copy and paste these (or type them) one by one to see how they work:
+
+Create a workspace: mkdir linux_practice && cd linux_practice
+
+Create a file with text: echo "Linux is powerful" > note.txt
+
+Read the file: cat note.txt
+
+Check permissions and details: ls -l
+
+Rename the file: mv note.txt learning.txt
+
+Clean up (Delete everything): cd .. && rm -rf linux_practice
+

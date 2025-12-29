@@ -1,0 +1,336 @@
+docker volume create my_volume
+docker volume ls
+docker volume inspect my_volume
+docker run -d -v my_volume:/data --name my_container ubuntu
+docker exec -it my_container bash
+docker volume rm my_volume
+docker volume prune
+docker run -d -v my_volume:/path/in/container --name new_container ubuntu
+docker exec -it new_container bash
+docker exec -it new_container ls /path/in/container
+
+docker stop $(docker ps -aq) && docker system prune -a --volumes -f  
+
+
+docker volume inspect $(docker volume ls -q)
+
+docker volume inspect my_volume
+
+## Get just the mountpoint
+docker volume inspect my_volume --format '{{ .Mountpoint }}'
+
+## Get name and mountpoint
+docker volume inspect my_volume --format 'Name: {{ .Name }}, Path: {{ .Mountpoint }}'
+
+
+## Automated Backup with Cron
+
+#!/bin/bash
+
+# Configuration
+CONTAINER="my_app"
+VOLUME_PATH="/app/data"
+BACKUP_DIR="/opt/backups"
+RETENTION_DAYS=7
+
+# Create timestamp
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+# Create backup
+docker run --rm \
+  --volumes-from $CONTAINER \
+  -v $BACKUP_DIR:/backup \
+  alpine tar czf /backup/backup_${TIMESTAMP}.tar.gz $VOLUME_PATH
+
+# Clean old backups
+find $BACKUP_DIR -name "backup_*.tar.gz" -mtime +$RETENTION_DAYS -delete
+
+mysql
+
+# Backup
+docker exec mysql_container mysqldump -u username -p password database_name > backup.sql
+
+# Restore
+docker exec -i mysql_container mysql -u username -p password database_name < backup.sql
+
+https://github.com/christianlempa/scripts
+
+## 1. Check the original container's mount points
+# Inspect the container's mounted volumes
+docker inspect <container> | grep -A 5 "Mounts"
+
+# Or more specifically:
+docker inspect <container> --format='{{range .Mounts}}{{.Destination}}{{"\n"}}{{end}}'
+
+## 2. Check the container's working directory
+# Get the working directory
+docker inspect <container> --format='{{.Config.WorkingDir}}'
+
+# Get the complete container config
+docker inspect <container> --format='{{json .Config}}' | jq .
+
+## 3. Backup Command
+
+# Backup MySQL data
+docker run --rm --volumes-from mysql-container -v $(pwd):/backup busybox tar cvfz /backup/backup.tar.gz /var/lib/mysql
+
+# Backup PostgreSQL data  
+docker run --rm --volumes-from postgres-container -v $(pwd):/backup busybox tar cvfz /backup/backup.tar.gz /var/lib/postgresql/data
+
+# If unsure, list volumes from the source container first
+docker run --rm --volumes-from <container> busybox ls -la /
+
+# Restore from specific backup file
+docker stop mysql-db
+
+docker run --rm --volumes-from mysql-db -v $(pwd):/backup busybox sh -c "cd / && tar xvfz /backup/backup.tar.gz"
+
+docker start mysql-db
+
+## example for my server 200
+docker run --rm --volumes-from mysql-db -v $(pwd):/backup busybox tar cvfz /backup/backup.tar.gz /var/lib/mysql
+
+####Then use the correct user ID in the restore:
+# Stop MySQL
+docker stop mysql-db
+
+# Restore with correct user ID (replace 999 with your actual MySQL user ID)
+docker run --rm --volumes-from mysql-db -v $(pwd):/backup busybox sh -c "cd / && tar xzf /backup/backup.tar.gz && chown -R 999:999 /var/lib/mysql"
+
+# Start MySQL
+docker start mysql-db
+
+# Check logs
+docker logs mysql-db
+
+
+#cron job for backup
+------------------------------------------------------------------------------------
+1.Create the Optimized Backup Script
+
+sudo nano /opt/scripts/mysql-smart-backup.sh
+2. paste 
+  ================================================
+
+  #!/bin/bash
+
+# Configuration
+BACKUP_DIR="/backup/mysql"
+CONTAINER_NAME="mysql-db"
+RETENTION_DAYS=2
+LOG_FILE="/var/log/mysql-smart-backup.log"
+CURRENT_DATE=$(date +%Y%m%d)
+
+# Log function
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> $LOG_FILE
+}
+
+# Check if backup directory exists
+if [ ! -d "$BACKUP_DIR" ]; then
+    mkdir -p "$BACKUP_DIR"
+    log "Created backup directory: $BACKUP_DIR"
+fi
+
+# Create timestamp for current backup
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="mysql-backup-${TIMESTAMP}.tar.gz"
+DAILY_BACKUP_FILE="mysql-daily-${CURRENT_DATE}.tar.gz"
+
+log "Starting MySQL backup: $BACKUP_FILE"
+
+# Perform backup
+docker run --rm \
+    --volumes-from $CONTAINER_NAME \
+    -v $BACKUP_DIR:/backup \
+    busybox tar cvfz /backup/$BACKUP_FILE /var/lib/mysql 2>> $LOG_FILE
+
+if [ $? -eq 0 ]; then
+    log "Backup completed successfully: $BACKUP_FILE"
+    
+    # Update daily backup with latest version
+    cp "$BACKUP_DIR/$BACKUP_FILE" "$BACKUP_DIR/$DAILY_BACKUP_FILE"
+    log "Updated daily backup: $DAILY_BACKUP_FILE"
+    
+    # Cleanup strategy:
+    log "Starting cleanup process..."
+    
+    # 1. Delete all minute-backups except the current one (keep only latest minute backup)
+    MINUTE_BACKUPS_COUNT=$(ls "$BACKUP_DIR"/mysql-backup-*.tar.gz 2>/dev/null | wc -l)
+    if [ $MINUTE_BACKUPS_COUNT -gt 1 ]; then
+        # Keep only the latest minute backup, delete all older minute backups
+        ls -t "$BACKUP_DIR"/mysql-backup-*.tar.gz | tail -n +2 | xargs -r rm
+        log "Deleted old minute backups, kept only latest"
+    fi
+    
+    # 2. Delete daily backups older than 2 days
+    find $BACKUP_DIR -name "mysql-daily-*.tar.gz" -mtime +$RETENTION_DAYS -delete
+    log "Deleted daily backups older than $RETENTION_DAYS days"
+    
+    # 3. Final cleanup: Ensure we only have what we want
+    #    - One latest minute backup (mysql-backup-YYYYMMDD_HHMMSS.tar.gz)
+    #    - Daily backups from last 2 days (mysql-daily-YYYYMMDD.tar.gz)
+    
+    log "Cleanup completed"
+else
+    log "BACKUP FAILED: $BACKUP_FILE"
+    exit 1
+fi
+
+# Log storage info
+if [ -f "$BACKUP_DIR/$BACKUP_FILE" ]; then
+    BACKUP_SIZE=$(du -h "$BACKUP_DIR/$BACKUP_FILE" | cut -f1)
+    TOTAL_SIZE=$(du -sh "$BACKUP_DIR" | cut -f1)
+    log "Latest backup size: $BACKUP_SIZE"
+    log "Total backup directory size: $TOTAL_SIZE"
+    
+    # List current backup files
+    log "Current backup files:"
+    ls -la "$BACKUP_DIR"/*.tar.gz 2>/dev/null | while read line; do
+        log "  $line"
+    done
+fi
+
+Step 2: Make Script Executable
+ sudo chmod +x /opt/scripts/mysql-smart-backup.sh
+
+Step 3: Create Log File
+
+sudo touch /var/log/mysql-smart-backup.log
+sudo chmod 644 /var/log/mysql-smart-backup.log
+
+Step 4: Set Up Cron Job for Every Minute
+
+sudo crontab -e
+Add this line:
+* * * * * /opt/scripts/mysql-smart-backup.sh
+
+Step 5: Test the Setup
+
+# Test manually
+sudo /opt/scripts/mysql-smart-backup.sh
+
+# Check results
+ls -la /backup/mysql/
+
+# Monitor logs
+tail -f /var/log/mysql-smart-backup.log
+
+Step 6: Monitoring Commands
+Check current backup status:
+# View current backup files with details
+find /backup/mysql -name "*.tar.gz" -type f -exec ls -la {} \; | sort -k8
+
+# Or simpler:
+ls -lt /backup/mysql/*.tar.gz 2>/dev/null || echo "No backups found"
+
+# Check disk usage
+du -sh /backup/mysql/
+
+Watch real-time backup activity:
+
+# Monitor logs in real-time
+tail -f /var/log/mysql-smart-backup.log
+
+# Watch directory for changes
+watch -n 5 'ls -la /backup/mysql/ && echo "---" && du -sh /backup/mysql/'
+
+>>Step 7: Restore Scripts
+sudo nano /opt/scripts/restore-latest.sh
+
+#!/bin/bash
+
+BACKUP_DIR="/backup/mysql"
+CONTAINER_NAME="mysql-db"
+
+# Get latest minute backup (most recent)
+LATEST_BACKUP=$(ls -t "$BACKUP_DIR"/mysql-backup-*.tar.gz 2>/dev/null | head -1)
+
+if [ -z "$LATEST_BACKUP" ]; then
+    echo "No backup files found!"
+    exit 1
+fi
+
+echo "Restoring from latest backup: $(basename $LATEST_BACKUP)"
+
+# Stop MySQL container
+docker stop $CONTAINER_NAME
+
+# Restore backup
+docker run --rm \
+    --volumes-from $CONTAINER_NAME \
+    -v $BACKUP_DIR:/backup \
+    busybox sh -c "cd / && rm -rf /var/lib/mysql/* && tar xvfz /backup/$(basename $LATEST_BACKUP)"
+
+# Start MySQL container
+docker start $CONTAINER_NAME
+
+echo "Restore completed successfully from: $(basename $LATEST_BACKUP)"
+
+Restore from specific daily backup:
+sudo nano /opt/scripts/restore-daily.sh
+
+#!/bin/bash
+
+DATE=$1
+BACKUP_DIR="/backup/mysql"
+CONTAINER_NAME="mysql-db"
+
+if [ -z "$DATE" ]; then
+    echo "Usage: $0 <YYYYMMDD>"
+    echo "Available daily backups:"
+    ls -t "$BACKUP_DIR"/mysql-daily-*.tar.gz 2>/dev/null | head -10
+    exit 1
+fi
+
+DAILY_BACKUP="$BACKUP_DIR/mysql-daily-${DATE}.tar.gz"
+
+if [ ! -f "$DAILY_BACKUP" ]; then
+    echo "Daily backup for $DATE not found: $DAILY_BACKUP"
+    echo "Available daily backups:"
+    ls -t "$BACKUP_DIR"/mysql-daily-*.tar.gz 2>/dev/null | head -10
+    exit 1
+fi
+
+echo "Restoring from daily backup: $(basename $DAILY_BACKUP)"
+
+# Stop MySQL container
+docker stop $CONTAINER_NAME
+
+# Restore backup
+docker run --rm \
+    --volumes-from $CONTAINER_NAME \
+    -v $BACKUP_DIR:/backup \
+    busybox sh -c "cd / && rm -rf /var/lib/mysql/* && tar xvfz /backup/$(basename $DAILY_BACKUP)"
+
+# Start MySQL container
+docker start $CONTAINER_NAME
+
+echo "Restore completed successfully from: $(basename $DAILY_BACKUP)"
+
+Make restore scripts executable:
+
+sudo chmod +x /opt/scripts/restore-latest.sh
+sudo chmod +x /opt/scripts/restore-daily.sh
+
+sudo chmod +x /opt/scripts/restore-latest.sh
+sudo chmod +x /opt/scripts/restore-daily.sh
+
+####What This Solution Provides:
+Every Minute Backup: Fresh backup created every minute
+
+Minimal Storage: Only keeps:
+
+One latest minute backup (constantly updated)
+
+One daily backup per day (for historical reference)
+
+Daily backups older than 2 days are automatically deleted
+
+Efficient: No storage waste from multiple minute backups
+
+Historical Reference: Can restore from any day in the last 2 days
+
+Latest Recovery: Always have the most recent data available
+
+This approach gives you the benefits of frequent backups without the storage overhead!

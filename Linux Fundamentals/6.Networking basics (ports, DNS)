@@ -1,0 +1,9 @@
+1. IP Addresses & Interfaces
+Every device on a network has an IP address. In Linux, these are attached to "interfaces" (
+like your Ethernet port or Wi-Fi chip).
+
+ip addr: Shows your current IP addresses and interfaces (e.g., eth0 or wlan0).
+
+ping [IP/Domain]: Sends a tiny packet to see if a destination is "alive" and how fast 
+the connection is.
+

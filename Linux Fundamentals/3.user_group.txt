@@ -1,0 +1,26 @@
+File,Purpose,Key Content
+/etc/passwd,User Information,"Username, User ID (UID), Home Directory, Default Shell."
+/etc/shadow,Secure Passwords,Encrypted passwords (only readable by root).
+/etc/group,Group Information,"Group name, Group ID (GID), and a list of members."
+
+Managing Users
+sudo useradd -m [username]: Creates a new user and a home directory (-m).
+
+sudo passwd [username]: Sets or changes a user's password.
+
+sudo userdel -r [username]: Deletes a user and their home directory (-r).
+
+id [username]: Displays the UID and all groups for a specific user.
+
+Managing Groups
+sudo groupadd [groupname]: Creates a new group (e.g., developers).
+
+sudo usermod -aG [groupname] [username]: Adds a user to a secondary group.
+
+Note: Always use -a (append) so you don't accidentally remove them from their other groups!
+
+groups [username]: A quick way to see which groups a user belongs to.
+
+
+
+link ::https://youtu.be/RN5_TIVk5RA
