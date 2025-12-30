@@ -1,0 +1,73 @@
+1. Platform Readiness
+
+Objective: Validate environment stability and governance
+
+docker version
+docker info
+docker help
+
+2. Image Strategy (Build Once, Run Anywhere)
+
+Objective: Standardize artifacts, reduce drift
+
+docker images
+docker pull <image>
+docker build -t app:version .
+docker tag app:version repo/app:version
+docker rmi <image>
+
+3. Container Operations (Run the Business)
+
+Objective: Fast, predictable workload execution
+
+docker run app
+docker run -d app
+docker run -p 8080:80 app
+docker ps
+docker ps -a
+docker stop <container>
+docker start <container>
+docker rm <container>
+
+4. Monitoring & Incident Response
+
+Objective: Maintain SLA, minimize downtime
+
+docker logs <container>
+docker logs -f <container>
+docker exec -it <container> /bin/bash
+docker inspect <container>
+docker stats
+
+5. Networking & Security
+
+Objective: Controlled service communication
+
+docker network ls
+docker network create prod-net
+docker network inspect prod-net
+
+6. Data Persistence & Compliance
+
+Objective: Protect stateful workloads
+
+docker volume ls
+docker volume create app-data
+docker volume inspect app-data
+
+7. Registry & CI/CD Enablement
+
+Objective: Enable automated delivery pipelines
+
+docker login
+docker push repo/app:version
+docker pull repo/app:version
+
+8. Cost & Hygiene Management
+
+Objective: Reduce waste, optimize infrastructure
+
+docker system df
+docker system prune
+docker image prune
+docker container prune

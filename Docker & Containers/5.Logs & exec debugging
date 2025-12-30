@@ -1,0 +1,62 @@
+Docker Logs & Exec – Debugging Cheat Sheet
+
+Rapid diagnosis. Minimal downtime. Controlled access.
+
+1. Log Visibility (First Line of Defense)
+
+Objective: Identify failures without disrupting service
+
+docker logs <container>
+docker logs -f <container>
+docker logs --tail 100 <container>
+docker logs --since 10m <container>
+
+
+Value: Accelerates root-cause analysis and reduces MTTR.
+
+2. Live Container Access (Controlled Intervention)
+
+Objective: Inspect runtime state securely
+
+docker exec -it <container> /bin/bash
+docker exec -it <container> /bin/sh
+
+
+Value: Enables real-time diagnostics without redeployment.
+
+3. Process & Resource Inspection
+
+Objective: Detect performance bottlenecks
+
+docker stats
+docker top <container>
+
+
+Value: Supports capacity planning and performance tuning.
+
+4. Configuration & Metadata Review
+
+Objective: Validate runtime configuration
+
+docker inspect <container>
+
+
+Key insights:
+
+Environment variables
+
+Mounted volumes
+
+Network bindings
+
+Restart policies
+
+5. Exit Codes & Failure Analysis
+
+Objective: Understand crash patterns
+
+docker ps -a
+docker inspect <container> | grep ExitCode
+
+
+Value: Drives preventive remediation strategies.
