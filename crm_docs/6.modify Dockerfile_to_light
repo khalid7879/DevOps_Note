@@ -1,0 +1,92 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+    container_name: saas_crm_ihelp_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - saas_crm_ihelp_network
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  webserver:
+    image: nginx:1.25-alpine
+    container_name: saas_crm_ihelp_webserver
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - .:/var/www
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - app
+    networks:
+      - saas_crm_ihelp_network
+
+  db:
+    image: mysql:5.7
+    container_name: saas_crm_ihelp_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+    volumes:
+      - saas_crm_ihelp_db_data:/var/lib/mysql
+    networks:
+      - saas_crm_ihelp_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  redis:
+    image: redis:7-alpine
+    container_name: saas_crm_ihelp_redis
+    restart: unless-stopped
+    networks:
+      - saas_crm_ihelp_network
+
+  phpmyadmin:
+    image: phpmyadmin:5.2
+    container_name: saas_crm_ihelp_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+      UPLOAD_LIMIT: 256M
+    ports:
+      - "127.0.0.1:8001:80"
+    depends_on:
+      - db
+    networks:
+      - saas_crm_ihelp_network
+    profiles:
+      - debug
+
+networks:
+  saas_crm_ihelp_network:
+    driver: bridge
+
+volumes:
+  saas_crm_ihelp_db_data:
+
+
