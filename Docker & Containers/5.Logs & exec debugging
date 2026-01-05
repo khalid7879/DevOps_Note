@@ -60,3 +60,66 @@ docker inspect <container> | grep ExitCode
 
 
 Value: Drives preventive remediation strategies.
+
+
+
+
+Docker Container Resource Monitoring – Key Commands
+
+Visibility → Control → Optimization
+
+1. Real-Time Resource Utilization
+
+Objective: Monitor live CPU, memory, network, and I/O usage
+
+docker stats
+
+
+Delivers:
+
+CPU % per container
+
+Memory usage vs limit
+
+Network I/O
+
+Block I/O
+
+2. Monitor Specific Containers
+
+Objective: Target critical workloads
+
+docker stats <container1> <container2>
+
+
+Use Case: Production-tier apps, CRM, call-center services.
+
+3. Process-Level Insight
+
+Objective: Identify resource-heavy processes inside containers
+
+docker top <container>
+
+
+Value: Enables rapid performance tuning and root-cause isolation.
+
+4. Configuration & Resource Limits Review
+
+Objective: Validate guardrails and prevent resource exhaustion
+
+docker inspect <container>
+
+
+Focus areas:
+
+Memory limits
+
+CPU shares / quotas
+
+Restart policies
+
+5. Host-Level Capacity Context
+
+Objective: Correlate container usage with host constraints
+
+docker system df
