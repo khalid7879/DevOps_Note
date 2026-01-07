@@ -5,6 +5,7 @@ Generate a modern Ed25519 key:
 ssh-keygen -t ed25519 -C "server-200-to-249" -f ~/.ssh/id_ed25519_249
 
 
+
 Check that the keys exist:
 
 ls -la ~/.ssh/
@@ -18,6 +19,9 @@ id_ed25519_249.pub  (public key)
 2. Transfer the Public Key to Destination Server (114.130.69.249)
 Preferred method (ssh-copy-id):
 ssh-copy-id -i ~/.ssh/id_ed25519_249.pub root@114.130.69.249
+
+ssh-copy-id -i ~/.ssh/id_ed25519_249.pub root@114.130.69.249
+
 
 
 If ssh-copy-id is missing:

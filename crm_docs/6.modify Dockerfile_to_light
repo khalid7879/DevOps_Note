@@ -36,7 +36,7 @@ services:
       - saas_crm_ihelp_network
 
   db:
-    image: mysql:5.7
+    image: mysql:8.0-oraclelinux8
     container_name: saas_crm_ihelp_db
     restart: unless-stopped
     env_file:
@@ -90,3 +90,8 @@ volumes:
   saas_crm_ihelp_db_data:
 
 
+**** For enable and disable the phpmyadmin debug
+
+docker-compose --profile debug up -d
+
+docker-compose stop phpmyadmin
