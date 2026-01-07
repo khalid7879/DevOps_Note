@@ -1,126 +1,99 @@
-1. Generate SSH Key Pair on Source Server (114.130.69.200)
+🔐 Goal
 
-Generate a modern Ed25519 key:
+✔ Login from Server A → Server B without password
+✔ Login from Server B → Server A without password
 
-ssh-keygen -t ed25519 -C "server-200-to-249" -f ~/.ssh/id_ed25519_249
+STEP 1️⃣ Generate SSH key on Server A
 
+Login to 114.130.69.249 using password one last time:
 
-
-Check that the keys exist:
-
-ls -la ~/.ssh/
-
-
-Expected:
-
-id_ed25519_249      (private key)
-id_ed25519_249.pub  (public key)
-
-2. Transfer the Public Key to Destination Server (114.130.69.249)
-Preferred method (ssh-copy-id):
-ssh-copy-id -i ~/.ssh/id_ed25519_249.pub root@114.130.69.249
-
-ssh-copy-id -i ~/.ssh/id_ed25519_249.pub root@114.130.69.249
-
-
-
-If ssh-copy-id is missing:
-
-yum install -y openssh-clients
-
-3. Manual Method (Plan B)
-
-If ssh-copy-id does not work:
-
-On source:
-cat ~/.ssh/id_ed25519_249.pub
-
-
-Copy the output.
-
-On destination (114.130.69.249):
 ssh root@114.130.69.249
-mkdir -p /root/.ssh
-chmod 700 /root/.ssh
-echo "PASTE_PUBLIC_KEY_HERE" >> /root/.ssh/authorized_keys
-chmod 600 /root/.ssh/authorized_keys
-
-4. Fix Permissions & Ownership on Destination Server (Mandatory for CentOS)
-
-On 114.130.69.249, run:
-
-chmod 700 /root
-chmod 700 /root/.ssh
-chmod 600 /root/.ssh/authorized_keys
-chown root:root /root -R
-
-5. Repair SELinux Context (CentOS-specific requirement)
-restorecon -Rv /root/.ssh
 
 
-Check if SELinux is enforcing:
+Generate SSH key:
 
-getenforce
-
-
-If it says Enforcing, the step above is critical.
-
-6. (Optional) Recopy the Key Cleanly in One Command
-cat ~/.ssh/id_ed25519_249.pub | ssh root@114.130.69.249 \
-"mkdir -p /root/.ssh && chmod 700 /root/.ssh && \
- cat >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys"
-
-7. Ensure SSH Server Configuration Allows Key Authentication
-
-Edit on 114.130.69.249:
-
-vi /etc/ssh/sshd_config
+ssh-keygen -t rsa -b 4096
 
 
-Ensure these lines are present:
+👉 Press Enter for all prompts
+(Key will be saved in /root/.ssh/id_rsa)
 
-PubkeyAuthentication yes
-AuthorizedKeysFile .ssh/authorized_keys
-PasswordAuthentication yes        # keep ON until key works
-PermitRootLogin prohibit-password # optional hardening
+STEP 2️⃣ Copy key from Server A → Server B
+
+From Server A:
+
+ssh-copy-id root@114.130.69.223
+
+
+🔑 Enter password once:
+
+noc@dev@
+
+
+✅ Now Server A can login to Server B without password.
+
+Test it:
+
+ssh root@114.130.69.223
+
+STEP 3️⃣ Generate SSH key on Server B
+
+Login to 114.130.69.223:
+
+ssh root@114.130.69.223
+
+
+Generate key:
+
+ssh-keygen -t rsa -b 4096
+
+
+Press Enter for all prompts.
+
+STEP 4️⃣ Copy key from Server B → Server A
+
+From Server B:
+
+ssh-copy-id root@114.130.69.249
+
+
+Enter password:
+
+noc@dev@
+
+
+Test it:
+
+ssh root@114.130.69.249
+
+✅ DONE — Passwordless SSH Enabled 🎉
+
+Now you can:
+
+ssh root@114.130.69.249
+ssh root@114.130.69.223
+
+
+👉 No password required
+
+🔒 (Optional but Recommended) Disable Root Password Login
+
+After confirming everything works:
+
+Edit SSH config on both servers:
+
+nano /etc/ssh/sshd_config
+
+
+Change:
+
+PasswordAuthentication no
+PermitRootLogin prohibit-password
 
 
 Restart SSH:
 
 systemctl restart sshd
 
-8. Test SSH Login from Source Server
-ssh -i ~/.ssh/id_ed25519_249 root@114.130.69.249
 
-
-If successful → passwordless login achieved.
-
-9. Post-Validation Hardening (Optional)
-
-After confirming key authentication works, you may disable password login:
-
-Edit:
-
-vi /etc/ssh/sshd_config
-
-
-Set:
-
-PasswordAuthentication no
-PermitRootLogin without-password
-
-
-Restart:
-
-systemctl restart sshd
-
-Final Version Summary
-
-Your corrected, structured, and future-proofed workflow now includes:
-
-✔ Key generation
-✔ Safe key transfer
-✔ Correct permissions
-✔ SELinux handling
-✔ SSH configuration alignment
-✔ Validation and optional hardening
+⚠️ Do this only after confirming SSH keys work
