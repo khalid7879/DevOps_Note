@@ -1,0 +1,289 @@
+1️⃣ Open MySQL Port on MASTER
+
+On 114.130.69.249
+
+ufw allow 3306
+
+🟢 STEP 1: Configure MySQL MASTER (114.130.69.249)
+
+📍 WHERE to Create the MySQL Master Config
+
+You should create it in the same directory where your docker-compose.yml lives on the MASTER server:
+
+📌 Server: 114.130.69.249
+📌 User: root
+
+✅ Correct Directory Structure (MASTER)
+
+Assuming your project is here:
+
+/var/www/saas-crm-ihelp/
+
+
+Your structure should look like this:
+
+/var/www/saas-crm-ihelp/
+├── docker-compose.yml
+├── .env
+├── mysql-master/
+│   └── conf/
+│       └── my.cnf   👈 CREATE THIS FILE HERE
+├── nginx/
+├── app/
+└── ...
+
+
+Then verify:
+
+docker exec saas_crm_ihelp_db mysql -uroot -p -e "SHOW VARIABLES LIKE 'log_bin';"
+
+You should see:
+
+log_bin | ON
+
+📁 Create MySQL Master Config
+mkdir -p mysql-master/conf
+nano mysql-master/conf/my.cnf
+
+[mysqld]
+server-id=1
+log-bin=mysql-bin
+binlog_format=ROW
+binlog_do_db=your_database_name
+bind-address=0.0.0.0
+
+
+***Because you have multiple databases, update your MASTER config.
+
+🔧 MASTER my.cnf
+[mysqld]
+server-id=1
+log-bin=mysql-bin
+binlog_format=ROW
+bind-address=0.0.0.0
+
+
+❌ REMOVE THIS LINE if present:
+
+binlog_do_db=your_database_name
+
+
+👉 Otherwise only one database will replicate.
+
+
+🐳 Your MASTER docker-compose.yml (DB Part)
+Ensure this volume exists:
+
+db:
+  image: mysql:8.0-oraclelinux8
+  container_name: saas_crm_ihelp_db
+  restart: unless-stopped
+  env_file:
+    - .env
+  environment:
+    MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+    MYSQL_DATABASE: ${DB_DATABASE}
+  volumes:
+    - saas_crm_ihelp_db_data:/var/lib/mysql
+    - ./mysql-master/conf/my.cnf:/etc/mysql/conf.d/my.cnf
+  ports:
+    - "3306:3306"
+
+🔄 Restart MySQL
+docker compose down
+docker compose up -d
+
+🟢 STEP 2: Create Replication User (MASTER)
+docker exec -it saas_crm_ihelp_db mysql -uroot -p
+
+CREATE USER 'repl'@'%' IDENTIFIED BY 'repl_password';
+GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%';
+FLUSH PRIVILEGES;
+
+📌 Get MASTER Status (CRITICAL)
+SHOW MASTER STATUS;
+
+
+Example output:
+
+File: mysql-bin.000003
+Position: 157
+
+
+👉 Save these values (you’ll need them)
+
+🟢 STEP 3: Take Consistent Backup from MASTER
+docker exec saas_crm_ihelp_db \
+mysqldump -uroot -p \
+--single-transaction \
+--routines \
+--triggers \
+--databases your_database_name > backup.sql
+
+
+alternative copy databases====================1.0 
+Backup EVERYTHING (ALL DATABASES)
+
+If you want everything including system DBs:
+
+docker exec saas_crm_ihelp_db \
+mysqldump -uroot -p \
+--single-transaction \
+--all-databases \
+--routines \
+--triggers \
+--events \
+> full_backup.sql
+
+
+⚠️ Use this only if SLAVE is clean (empty MySQL).
+
+alternative copy databases====================2.0 
+
+Take Backup on MASTER (114.130.69.249)
+
+Run this on the MASTER server:
+
+docker exec saas_crm_ihelp_db \
+mysqldump \
+--socket=/var/run/mysqld/mysqld.sock \
+-uroot \
+--single-transaction \
+--routines \
+--triggers \
+--events \
+--databases \
+sass_crm_db_ihelp_2025 \
+sass_crm_db_ihelp_2025_gates-and-watkins-traders \
+sass_crm_db_ihelp_2025_ihelpbd-2026 \
+sass_crm_db_ihelp_2025_ihelpkl \
+sass_crm_db_ihelp_2025_sakil-com \
+> all_crm_databases.sql
+
+
+
+
+📤 Copy Backup to SLAVE Server
+
+From your local machine or MASTER:
+
+scp backup.sql root@114.130.69.223:/root/
+
+🟡 STEP 4: Setup MySQL SLAVE (114.130.69.223)
+📁 Create Slave Config
+
+🟡 SLAVE Server Location (For Comparison)
+
+On 114.130.69.223, same idea:
+
+/var/www/mysql-slave/
+├── docker-compose.yml
+└── mysql-slave/
+    └── conf/
+        └── my.cnf
+
+
+mkdir -p mysql-slave/conf
+nano mysql-slave/conf/my.cnf
+
+[mysqld]
+server-id=2
+relay-log=relay-log
+read_only=ON
+bind-address=0.0.0.0
+
+🐳 Slave docker-compose.yml
+
+Minimal version:
+
+version: "3.9"
+
+services:
+  db:
+    image: mysql:8.0-oraclelinux8
+    container_name: mysql_slave
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: your_root_password
+    volumes:
+      - mysql_slave_data:/var/lib/mysql
+      - ./mysql-slave/conf/my.cnf:/etc/mysql/conf.d/my.cnf
+    ports:
+      - "3306:3306"
+
+volumes:
+  mysql_slave_data:
+
+▶ Start Slave
+docker compose up -d
+
+
+🔐 Final Safety Check (Recommended)
+
+On SLAVE:
+
+SHOW VARIABLES LIKE 'read_only';
+
+
+Must be:
+
+read_only | ON
+
+🟡 STEP 5: Restore Backup on SLAVE
+docker exec -i mysql_slave mysql -uroot -p < backup.sql
+
+🔴 STEP 6: Configure Replication on SLAVE
+docker exec -it mysql_slave mysql -uroot -p
+
+CHANGE MASTER TO
+MASTER_HOST='114.130.69.249',
+MASTER_USER='repl',
+MASTER_PASSWORD='repl_password',
+MASTER_LOG_FILE='mysql-bin.000003',
+MASTER_LOG_POS=157;
+
+START SLAVE;
+
+✅ Verify Replication
+SHOW SLAVE STATUS\G
+
+
+You MUST see:
+
+Slave_IO_Running: Yes
+Slave_SQL_Running: Yes
+
+
+🎉 Replication is LIVE
+
+🟣 STEP 7: Real-Time Backup Strategy (Slave)
+📦 Daily Backup from SLAVE (Recommended)
+
+Create cron job on 114.130.69.223:
+
+crontab -e
+
+0 2 * * * docker exec mysql_slave \
+mysqldump -uroot -pPASSWORD your_database_name \
+> /backup/db_$(date +\%F).sql
+
+
+✔ No load on MASTER
+✔ Safe rollback point
+
+🧠 Best Practices (Strongly Recommended)
+
+✅ Never write to SLAVE
+✅ Monitor replication lag
+
+Seconds_Behind_Master
+
+
+✅ Use SLAVE for:
+
+Reporting
+
+Analytics
+
+Full backups
+
