@@ -1,0 +1,247 @@
+✅ COMPLETE MYSQL MASTER → SLAVE REPLICATION
+
+(Docker • MySQL 8 • SaaS • Multiple Databases)
+
+🧱 ARCHITECTURE
+Laravel App
+   |
+   |  (writes)
+   v
+MySQL MASTER  (114.130.69.249)
+   |
+   |  (binlog replication)
+   v
+MySQL SLAVE   (114.130.69.223)
+
+
+MASTER → all writes
+
+SLAVE → read / backup / reporting
+
+ALL databases replicate (important for SaaS)
+
+🟢 STEP 1 — PREPARE MASTER (114.130.69.249)
+1️⃣ Create MySQL config for MASTER
+
+📍 Location:
+
+/var/www/saas-crm-ihelp/mysql-master/conf/my.cnf
+
+✅ Correct MASTER my.cnf
+[mysqld]
+server-id=1
+log-bin=mysql-bin
+binlog_format=ROW
+bind-address=0.0.0.0
+
+
+❌ DO NOT use:
+
+binlog_do_db
+binlog_ignore_db
+
+2️⃣ Docker Compose (MASTER MySQL)
+
+Ensure your MySQL service mounts the config:
+
+db:
+  image: mysql:8.0-oraclelinux8
+  container_name: saas_crm_ihelp_db
+  restart: unless-stopped
+  env_file:
+    - .env
+  volumes:
+    - saas_crm_ihelp_db_data:/var/lib/mysql
+    - ./mysql-master/conf/my.cnf:/etc/mysql/conf.d/my.cnf
+  ports:
+    - "3306:3306"
+
+
+Restart MASTER MySQL:
+
+docker compose restart db
+
+3️⃣ Create Replication User (MASTER)
+docker exec -it saas_crm_ihelp_db mysql -uroot -p
+
+CREATE USER 'repl'@'%' IDENTIFIED WITH mysql_native_password BY 'repl_password';
+GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%';
+FLUSH PRIVILEGES;
+
+4️⃣ Get MASTER Position (VERY IMPORTANT)
+SHOW MASTER STATUS;
+
+
+Example output:
+
+File: mysql-bin.000002
+Position: 157
+
+
+📌 SAVE THESE VALUES
+
+🟡 STEP 2 — BACKUP MASTER DATA (ONE TIME)
+
+Run on MASTER:
+
+docker exec saas_crm_ihelp_db \
+mysqldump \
+-h127.0.0.1 \
+--protocol=tcp \
+-ubackup -pBackup@123 \
+--single-transaction \
+--routines \
+--triggers \
+--events \
+--no-tablespaces \
+--all-databases \
+> all_databases.sql
+
+
+Copy to SLAVE:
+
+scp all_databases.sql root@114.130.69.223:/root/
+
+🟡 STEP 3 — PREPARE SLAVE (114.130.69.223)
+5️⃣ Create SLAVE folders
+mkdir -p /var/www/mysql-slave/mysql-slave/conf
+cd /var/www/mysql-slave
+
+6️⃣ SLAVE my.cnf
+
+📍 /var/www/mysql-slave/mysql-slave/conf/my.cnf
+
+[mysqld]
+server-id=2
+relay-log=relay-log
+read_only=ON
+super_read_only=ON
+bind-address=0.0.0.0
+
+7️⃣ SLAVE docker-compose.yml
+
+📍 /var/www/mysql-slave/docker-compose.yml
+
+version: "3.9"
+
+services:
+  db:
+    image: mysql:8.0-oraclelinux8
+    container_name: mysql_slave
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: your_root_password
+    volumes:
+      - mysql_slave_data:/var/lib/mysql
+      - ./mysql-slave/conf/my.cnf:/etc/mysql/conf.d/my.cnf
+    ports:
+      - "3306:3306"
+
+volumes:
+  mysql_slave_data:
+
+
+Start SLAVE:
+
+docker compose up -d
+
+🟡 STEP 4 — RESTORE DATA ON SLAVE
+docker exec -i mysql_slave \
+mysql -h127.0.0.1 --protocol=tcp -uroot -p \
+< /root/all_databases.sql
+
+🔴 STEP 5 — CONFIGURE REPLICATION (SLAVE)
+
+Login to SLAVE MySQL:
+
+docker exec -it mysql_slave \
+mysql -h127.0.0.1 --protocol=tcp -uroot -p
+
+8️⃣ Point SLAVE to MASTER
+
+Use values from STEP 4:
+
+STOP SLAVE;
+RESET SLAVE ALL;
+
+CHANGE MASTER TO
+MASTER_HOST='114.130.69.249',
+MASTER_USER='repl',
+MASTER_PASSWORD='repl_password',
+MASTER_PORT=3306,
+MASTER_LOG_FILE='mysql-bin.000002',
+MASTER_LOG_POS=157;
+
+START SLAVE;
+
+9️⃣ Verify Replication
+SHOW SLAVE STATUS\G
+
+✅ SUCCESS STATE
+Slave_IO_Running: Yes
+Slave_SQL_Running: Yes
+Seconds_Behind_Master: 0
+
+
+🎉 Replication is LIVE.
+
+🟢 STEP 6 — FINAL TEST (MANDATORY)
+On MASTER:
+USE sass_crm_db_ihelp_2025;
+
+CREATE TABLE replication_test (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  note VARCHAR(50)
+);
+
+INSERT INTO replication_test (note)
+VALUES ('replication working');
+
+On SLAVE:
+USE sass_crm_db_ihelp_2025;
+SELECT * FROM replication_test;
+
+✅ Output:
++----+---------------------+
+| id | note                |
++----+---------------------+
+|  1 | replication working |
++----+---------------------+
+
+☁ STEP 7 — SAAS & TENANT DATABASES (IMPORTANT)
+
+✔ App creates new DB:
+
+CREATE DATABASE tenant_2026_xyz;
+
+
+✔ It replicates automatically
+✔ No config change required
+
+⚡ STEP 8 — LARAVEL READ / WRITE SPLIT (OPTIONAL)
+
+Already covered, but summary:
+
+Writes → MASTER
+
+Reads → SLAVE
+
+sticky => true enabled
+
+🔐 STEP 9 — BEST PRACTICES (DO NOT SKIP)
+Rule	Reason
+Never write on SLAVE	Breaks replication
+No binlog_do_db	SaaS multi-DB
+Backups from SLAVE	No load on MASTER
+Monitor lag	Stability
+Test restore monthly	Safety
+🏁 FINAL RESULT
+
+You now have:
+
+✅ MySQL Master → Slave
+✅ Docker-based
+✅ Multi-database SaaS ready
+✅ Real-time sync
+✅ Safe backups
+✅ Production-grade setup

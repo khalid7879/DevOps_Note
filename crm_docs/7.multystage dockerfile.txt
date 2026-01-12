@@ -1,0 +1,390 @@
+version: "3.9"
+
+services:
+  # ------------------------------------
+  # PHP CRM Application
+  # ------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: saas_crm_ihelp_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - saas_crm_ihelp_network
+
+  # ------------------------------------
+  # Nginx Web Server
+  # ------------------------------------
+  webserver:
+    image: nginx:1.25-alpine
+    container_name: saas_crm_ihelp_webserver
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - .:/var/www
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - app
+    networks:
+      - saas_crm_ihelp_network
+
+  # ------------------------------------
+  # MySQL 8.0 (Slim-like)
+  # ------------------------------------
+  db:
+    image: mysql:8.0-oraclelinux8
+    container_name: saas_crm_ihelp_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+    volumes:
+      - saas_crm_ihelp_db_data:/var/lib/mysql
+    networks:
+      - saas_crm_ihelp_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ------------------------------------
+  # Redis (Cache / Sessions)
+  # ------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: saas_crm_ihelp_redis
+    restart: unless-stopped
+    networks:
+      - saas_crm_ihelp_network
+
+  # ------------------------------------
+  # phpMyAdmin (DEBUG ONLY)
+  # ------------------------------------
+  phpmyadmin:
+    image: phpmyadmin:5.2
+    container_name: saas_crm_ihelp_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+      UPLOAD_LIMIT: 256M
+    ports:
+      - "127.0.0.1:8001:80"
+    depends_on:
+      - db
+    networks:
+      - saas_crm_ihelp_network
+    profiles:
+      - debug
+
+networks:
+  saas_crm_ihelp_network:
+    driver: bridge
+
+volumes:
+  saas_crm_ihelp_db_data:
+
+
+
+# =========================================
+# STAGE 1: Build dependencies (Composer)
+# =========================================
+FROM composer:2.7 AS builder
+
+WORKDIR /app
+
+# Copy composer files first (cache optimization)
+COPY composer.json composer.lock ./
+
+RUN composer install \
+    --no-dev \
+    --prefer-dist \
+    --optimize-autoloader \
+    --no-interaction
+
+# Copy full application
+COPY . .
+
+# Laravel optimizations (safe even if not Laravel)
+RUN if [ -f artisan ]; then \
+    php artisan config:clear && \
+    php artisan config:cache && \
+    php artisan route:cache && \
+    php artisan view:cache ; \
+    fi
+
+
+# =========================================
+# STAGE 2: Runtime (Small & Secure)
+# =========================================
+FROM php:8.2-fpm-alpine
+
+WORKDIR /var/www
+
+# Install runtime-only dependencies
+RUN apk add --no-cache \
+    bash \
+    curl \
+    icu-dev \
+    libzip-dev \
+    oniguruma-dev \
+    mysql-client \
+    && docker-php-ext-install \
+    pdo \
+    pdo_mysql \
+    intl \
+    zip \
+    opcache
+
+# PHP production settings
+RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.memory_consumption=256" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.max_accelerated_files=20000" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/opcache.ini
+
+# Copy built app from builder
+COPY --from=builder /app /var/www
+
+# Permissions (important for CRM apps)
+RUN chown -R www-data:www-data /var/www \
+ && chmod -R 775 /var/www/storage /var/www/bootstrap/cache || true
+
+USER www-data
+
+EXPOSE 9000
+
+CMD ["php-fpm"]
+Dockerfile (Multi-Stage, Stable)
+
+📍 Location: project root → Dockerfile
+
+# =========================================
+# STAGE 1: Composer Dependencies
+# =========================================
+FROM composer:2.7 AS builder
+
+WORKDIR /app
+
+# Copy composer files first (better caching)
+COPY composer.json composer.lock ./
+
+# Install ALL dependencies (faker needed for tenant seeding)
+RUN composer install \
+    --prefer-dist \
+    --optimize-autoloader \
+    --no-interaction \
+    --no-scripts
+
+# Copy full application
+COPY . .
+
+# =========================================
+# STAGE 2: PHP Runtime (Production)
+# =========================================
+FROM php:8.2-fpm-alpine
+
+WORKDIR /var/www
+
+# Install PHP extensions
+RUN apk add --no-cache \
+    bash \
+    curl \
+    icu-dev \
+    libzip-dev \
+    oniguruma-dev \
+    mysql-client \
+    && docker-php-ext-install \
+    pdo \
+    pdo_mysql \
+    intl \
+    zip \
+    opcache
+
+# OPCache (performance)
+RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.enable_cli=1" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.memory_consumption=256" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.max_accelerated_files=20000" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/opcache.ini
+
+# Copy built app
+COPY --from=builder /app /var/www
+
+# Permissions
+RUN chown -R www-data:www-data /var/www \
+ && chmod -R 775 storage bootstrap/cache || true
+
+USER www-data
+
+EXPOSE 9000
+CMD ["php-fpm"]
+
+FINAL docker-compose.yml
+
+📍 Location: project root → docker-compose.yml
+
+version: "3.9"
+
+services:
+  # ------------------------------------
+  # Laravel App (PHP-FPM)
+  # ------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: saas_crm_ihelp_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - saas_crm_ihelp_network
+
+  # ------------------------------------
+  # Nginx
+  # ------------------------------------
+  webserver:
+    image: nginx:1.25-alpine
+    container_name: saas_crm_ihelp_webserver
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - .:/var/www
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - app
+    networks:
+      - saas_crm_ihelp_network
+
+  # ------------------------------------
+  # MySQL 8 (Master)
+  # ------------------------------------
+  db:
+    image: mysql:8.0-oraclelinux8
+    container_name: saas_crm_ihelp_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+    volumes:
+      - saas_crm_ihelp_db_data:/var/lib/mysql
+      - ./mysql-master/conf/my.cnf:/etc/mysql/conf.d/my.cnf
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - saas_crm_ihelp_network
+
+  # ------------------------------------
+  # Redis
+  # ------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: saas_crm_ihelp_redis
+    restart: unless-stopped
+    networks:
+      - saas_crm_ihelp_network
+
+  # ------------------------------------
+  # phpMyAdmin (DEBUG ONLY)
+  # ------------------------------------
+  phpmyadmin:
+    image: phpmyadmin:5.2
+    container_name: saas_crm_ihelp_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+    ports:
+      - "127.0.0.1:8001:80"
+    depends_on:
+      - db
+    profiles:
+      - debug
+    networks:
+      - saas_crm_ihelp_network
+
+networks:
+  saas_crm_ihelp_network:
+    driver: bridge
+
+volumes:
+  saas_crm_ihelp_db_data:
+
+📁 REQUIRED FOLDER STRUCTURE
+saas-crm-ihelp/
+├── Dockerfile
+├── docker-compose.yml
+├── .env
+├── nginx/conf.d/default.conf
+├── mysql-master/conf/my.cnf
+├── app/
+├── public/
+├── storage/
+└── bootstrap/
+
+▶️ STEP-BY-STEP: HOW TO RUN MULTI-STAGE (SAVE THIS)
+✅ STEP 1: FIRST BUILD (IMPORTANT)
+docker-compose down
+docker-compose build --no-cache app
+docker-compose up -d
+
+✅ STEP 2: CREATE .env (ONLY FIRST TIME)
+docker exec -it saas_crm_ihelp_app cp .env.example .env
+
+✅ STEP 3: GENERATE APP KEY
+docker exec -it saas_crm_ihelp_app php artisan key:generate
+
+✅ STEP 4: FIX PERMISSIONS
+docker exec -it saas_crm_ihelp_app sh -c "
+chown -R www-data:www-data storage bootstrap/cache &&
+chmod -R 775 storage bootstrap/cache
+"
+
+✅ STEP 5: DATABASE
+docker exec -it saas_crm_ihelp_app php artisan migrate --force
+
+✅ STEP 6: TENANT SEEDING (NO --force)
+yes | docker exec -i saas_crm_ihelp_app php artisan tenant:seed
+
+🚀 STEP 7: PRODUCTION OPTIMIZATION (VERY IMPORTANT)
+docker exec -it saas_crm_ihelp_app php artisan optimize:clear
+docker exec -it saas_crm_ihelp_app php artisan optimize
+
+🔐 STEP 8: TURN OFF DEBUG
+docker exec -it saas_crm_ihelp_app sed -i 's/APP_DEBUG=true/APP_DEBUG=false/' .env
+docker exec -it saas_crm_ihelp_app sed -i 's/APP_ENV=local/APP_ENV=production/' .env
+docker-compose restart app
+
+🧪 STEP 9: VERIFY SPEED
+time curl -o /dev/null http://localhost
+
+
+✅ < 300ms = healthy
+🚀 < 150ms = excellent
+
+🧠 STEP 10: DEBUG TOOLS (WHEN NEEDED)
+docker-compose --profile debug up -d phpmyadmin
+docker-compose stop phpmyadmin

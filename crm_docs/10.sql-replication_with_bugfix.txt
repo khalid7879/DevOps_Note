@@ -287,3 +287,79 @@ Analytics
 
 Full backups
 
+
+
+🟢 Solution: Use a DEDICATED DUMP USER (Recommended for Production)
+
+This avoids all root auth weirdness and is how MySQL is meant to be used.
+
+🔹 STEP 1: Create a Backup User (ONE TIME)
+
+Run this inside the container (this login will work):
+
+docker exec -it saas_crm_ihelp_db mysql -uroot -p
+
+
+Enter your root password, then run:
+
+CREATE USER 'backup'@'%' IDENTIFIED BY 'Backup@123';
+GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, LOCK TABLES ON *.* TO 'backup'@'%';
+FLUSH PRIVILEGES;
+EXIT;
+
+(BEST & SIMPLE): Disable Tablespace Dump
+
+Just add one flag.
+
+✔ RECOMMENDED COMMAND (SAFE)
+docker exec saas_crm_ihelp_db \
+mysqldump \
+-h127.0.0.1 \
+--protocol=tcp \
+-ubackup \
+-pBackup@123 \
+--single-transaction \
+--routines \
+--triggers \
+--events \
+--no-tablespaces \
+--databases \
+sass_crm_db_ihelp_2025 \
+sass_crm_db_ihelp_2025_gates-and-watkins-traders \
+sass_crm_db_ihelp_2025_ihelpbd-2026 \
+sass_crm_db_ihelp_2025_ihelpkl \
+sass_crm_db_ihelp_2025_sakil-com \
+> all_crm_databases.sql
+
+
+👉 This is industry best practice
+👉 No need for PROCESS privilege
+👉 100% safe for restores
+
+🔁 FIX OPTION 2 (NOT RECOMMENDED): Grant PROCESS Privilege
+
+Only do this if you insist.
+
+GRANT PROCESS ON *.* TO 'backup'@'%';
+FLUSH PRIVILEGES;
+
+
+⚠️ Gives wider visibility — not ideal for backups.
+
+✅ Verify Success
+ls -lh all_crm_databases.sql
+
+
+Expected:
+
+File size increasing
+
+No errors
+
+Optional:
+
+grep "CREATE DATABASE" all_crm_databases.sql
+
+
+You should see all 5 databases.
+
