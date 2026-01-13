@@ -1,0 +1,279 @@
+# =================================================
+# STAGE 1: Composer (dependencies)
+# =================================================
+FROM composer:2.7 AS builder
+
+WORKDIR /app
+
+COPY composer.json composer.lock ./
+
+# Install all deps (Faker needed for tenant seeding)
+RUN composer install \
+    --prefer-dist \
+    --optimize-autoloader \
+    --no-interaction \
+    --no-scripts
+
+COPY . .
+
+# =================================================
+# STAGE 2: PHP Runtime
+# =================================================
+FROM php:8.2-fpm-alpine
+
+WORKDIR /var/www
+
+# System + PHP extensions
+RUN apk add --no-cache \
+    bash curl icu-dev libzip-dev oniguruma-dev mysql-client \
+ && docker-php-ext-install \
+    pdo pdo_mysql intl zip opcache
+
+# PHP OPCache
+RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.enable_cli=1" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.memory_consumption=256" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.max_accelerated_files=20000" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/opcache.ini
+
+# PHP Memory
+RUN echo "memory_limit=512M" > /usr/local/etc/php/conf.d/memory.ini
+
+# App code
+COPY --from=builder /app /var/www
+COPY docker/entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /entrypoint.sh \
+ && chown -R www-data:www-data /var/www
+
+USER www-data
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["php-fpm"]
+
+🐳 2️⃣ FINAL docker-compose.yml
+
+📍 Location: saas-crm-ihelp/docker-compose.yml
+
+version: "3.9"
+
+services:
+  # -----------------------------
+  # Laravel App
+  # -----------------------------
+  app:
+    build:
+      context: .
+    container_name: saas_crm_ihelp_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RUN_TENANT_SEED: "true"
+    depends_on:
+      db-master:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - saas_crm_ihelp_network
+
+  # -----------------------------
+  # Nginx
+  # -----------------------------
+  webserver:
+    image: nginx:1.25-alpine
+    container_name: saas_crm_ihelp_webserver
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - .:/var/www
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - app
+    networks:
+      - saas_crm_ihelp_network
+
+  # -----------------------------
+  # MySQL MASTER
+  # -----------------------------
+  db-master:
+    image: mysql:8.0-oraclelinux8
+    container_name: saas_crm_ihelp_db_master
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+    volumes:
+      - db_master_data:/var/lib/mysql
+      - ./mysql/master/my.cnf:/etc/mysql/conf.d/my.cnf
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - saas_crm_ihelp_network
+
+  # -----------------------------
+  # MySQL REPLICA
+  # -----------------------------
+  db-replica:
+    image: mysql:8.0-oraclelinux8
+    container_name: saas_crm_ihelp_db_replica
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - db_replica_data:/var/lib/mysql
+      - ./mysql/replica/my.cnf:/etc/mysql/conf.d/my.cnf
+    depends_on:
+      db-master:
+        condition: service_healthy
+    ports:
+      - "3307:3306"
+    networks:
+      - saas_crm_ihelp_network
+
+  # -----------------------------
+  # Redis
+  # -----------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: saas_crm_ihelp_redis
+    restart: unless-stopped
+    networks:
+      - saas_crm_ihelp_network
+
+  # -----------------------------
+  # phpMyAdmin (DEBUG ONLY)
+  # -----------------------------
+  phpmyadmin:
+    image: phpmyadmin:5.2
+    container_name: saas_crm_ihelp_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db-master
+    ports:
+      - "127.0.0.1:8001:80"
+    profiles:
+      - debug
+    networks:
+      - saas_crm_ihelp_network
+
+networks:
+  saas_crm_ihelp_network:
+    driver: bridge
+
+volumes:
+  db_master_data:
+  db_replica_data:
+
+🧾 3️⃣ entrypoint.sh (Automation Script)
+
+📍 Location: saas-crm-ihelp/docker/entrypoint.sh
+
+#!/bin/sh
+set -e
+
+echo "🚀 Starting Laravel container..."
+
+# Wait for DB
+until php -r "
+new PDO(
+  'mysql:host='.getenv('DB_HOST').';dbname='.getenv('DB_DATABASE'),
+  getenv('DB_USERNAME'),
+  getenv('DB_PASSWORD')
+);" >/dev/null 2>&1; do
+  echo "⏳ Waiting for database..."
+  sleep 2
+done
+
+# Create .env
+if [ ! -f .env ]; then
+  cp .env.example .env
+fi
+
+# APP_KEY
+if ! grep -q '^APP_KEY=base64:' .env; then
+  php artisan key:generate
+fi
+
+# Permissions
+chown -R www-data:www-data storage bootstrap/cache
+chmod -R 775 storage bootstrap/cache
+
+# Optimize
+php artisan optimize:clear
+php artisan optimize
+
+# Migrate
+php artisan migrate --force || true
+
+# Tenant seed (optional)
+if [ "$RUN_TENANT_SEED" = "true" ]; then
+  yes | php artisan tenant:seed || true
+fi
+
+echo "✅ Laravel ready"
+
+exec "$@"
+
+
+Make executable:
+
+chmod +x docker/entrypoint.sh
+sed -i 's/\r$//' docker/entrypoint.sh
+
+▶️ 4️⃣ STEP-BY-STEP PROCESS (SAVE THIS)
+🔹 STEP 1: Prepare .env
+APP_ENV=production
+APP_DEBUG=false
+
+DB_CONNECTION=mysql
+DB_HOST=db-master
+DB_PORT=3306
+DB_DATABASE=saas_crm
+DB_USERNAME=root
+DB_PASSWORD=strong_password
+
+CACHE_DRIVER=redis
+SESSION_DRIVER=redis
+QUEUE_CONNECTION=redis
+REDIS_HOST=redis
+
+🔹 STEP 2: Build & Start Everything
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+
+🔹 STEP 3: Verify Containers
+docker ps
+
+🔹 STEP 4: Verify App
+curl -I http://localhost
+
+
+Expected:
+
+HTTP/1.1 200 OK
+
+🔹 STEP 5: Verify MySQL Replication
+docker exec -it saas_crm_ihelp_db_replica mysql -uroot -p -e "SHOW SLAVE STATUS\G"
+
+
+Must show:
+
+Slave_IO_Running: Yes
+Slave_SQL_Running: Yes
+
+🔹 STEP 6: phpMyAdmin (Only When Needed)
+docker-compose --profile debug up -d phpmyadmin
+docker-compose stop phpmyadmin
+yes | docker exec -i saas_crm_ihelp_app php artisan tenant:seed
