@@ -46,10 +46,7 @@ all_crm_databases.sql
 # -------------------------------
 # Logs & Cache
 # -------------------------------
-storage/logs
-storage/framework/cache
-storage/framework/sessions
-storage/framework/views
+
 
 # -------------------------------
 # Docker / CI files not needed in image

@@ -58,9 +58,6 @@ CMD ["php-fpm"]
 version: "3.9"
 
 services:
-  # -----------------------------
-  # Laravel App
-  # -----------------------------
   app:
     build:
       context: .
@@ -71,16 +68,13 @@ services:
     environment:
       RUN_TENANT_SEED: "true"
     depends_on:
-      db-master:
+      db:
         condition: service_healthy
       redis:
         condition: service_started
     networks:
       - saas_crm_ihelp_network
 
-  # -----------------------------
-  # Nginx
-  # -----------------------------
   webserver:
     image: nginx:1.25-alpine
     container_name: saas_crm_ihelp_webserver
@@ -95,12 +89,9 @@ services:
     networks:
       - saas_crm_ihelp_network
 
-  # -----------------------------
-  # MySQL MASTER
-  # -----------------------------
-  db-master:
+  db:
     image: mysql:8.0-oraclelinux8
-    container_name: saas_crm_ihelp_db_master
+    container_name: saas_crm_ihelp_db
     restart: unless-stopped
     env_file:
       - .env
@@ -108,9 +99,8 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_DATABASE: ${DB_DATABASE}
     volumes:
-      - db_master_data:/var/lib/mysql
-      - ./mysql/master/my.cnf:/etc/mysql/conf.d/my.cnf
-      - ./mysql/init:/docker-entrypoint-initdb.d
+      - saas_crm_ihelp_db_data:/var/lib/mysql
+      - ./mysql-master/conf/my.cnf:/etc/mysql/conf.d/my.cnf
     ports:
       - "3306:3306"
     healthcheck:
@@ -121,29 +111,6 @@ services:
     networks:
       - saas_crm_ihelp_network
 
-  # -----------------------------
-  # MySQL REPLICA
-  # -----------------------------
-  db-replica:
-    image: mysql:8.0-oraclelinux8
-    container_name: saas_crm_ihelp_db_replica
-    restart: unless-stopped
-    env_file:
-      - .env
-    volumes:
-      - db_replica_data:/var/lib/mysql
-      - ./mysql/replica/my.cnf:/etc/mysql/conf.d/my.cnf
-    depends_on:
-      db-master:
-        condition: service_healthy
-    ports:
-      - "3307:3306"
-    networks:
-      - saas_crm_ihelp_network
-
-  # -----------------------------
-  # Redis
-  # -----------------------------
   redis:
     image: redis:7-alpine
     container_name: saas_crm_ihelp_redis
@@ -151,17 +118,16 @@ services:
     networks:
       - saas_crm_ihelp_network
 
-  # -----------------------------
-  # phpMyAdmin (DEBUG ONLY)
-  # -----------------------------
   phpmyadmin:
     image: phpmyadmin:5.2
     container_name: saas_crm_ihelp_phpmyadmin
     restart: unless-stopped
     environment:
-      PMA_HOST: db-master
+      PMA_HOST: db
     ports:
       - "127.0.0.1:8001:80"
+    depends_on:
+      - db
     profiles:
       - debug
     networks:
@@ -172,8 +138,12 @@ networks:
     driver: bridge
 
 volumes:
-  db_master_data:
-  db_replica_data:
+  saas_crm_ihelp_db_data:
+
+
+
+
+
 
 🧾 3️⃣ entrypoint.sh (Automation Script)
 
@@ -264,16 +234,3 @@ Expected:
 
 HTTP/1.1 200 OK
 
-🔹 STEP 5: Verify MySQL Replication
-docker exec -it saas_crm_ihelp_db_replica mysql -uroot -p -e "SHOW SLAVE STATUS\G"
-
-
-Must show:
-
-Slave_IO_Running: Yes
-Slave_SQL_Running: Yes
-
-🔹 STEP 6: phpMyAdmin (Only When Needed)
-docker-compose --profile debug up -d phpmyadmin
-docker-compose stop phpmyadmin
-yes | docker exec -i saas_crm_ihelp_app php artisan tenant:seed
