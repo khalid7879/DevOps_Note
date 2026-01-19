@@ -1,0 +1,387 @@
+
+.Dockerignore
+# -------------------------------
+# Git & VCS
+# -------------------------------
+.git
+.gitignore
+.gitattributes
+.github
+
+# -------------------------------
+# Environment / Secrets
+# -------------------------------
+.env
+.env.*
+!.env.example
+
+# -------------------------------
+# Node / Frontend
+# -------------------------------
+node_modules
+npm-debug.log
+yarn-error.log
+.vite
+dist
+build
+
+# -------------------------------
+# Composer (handled in builder stage)
+# -------------------------------
+vendor
+
+# -------------------------------
+# Tests & Dev Tools
+# -------------------------------
+tests
+phpunit.xml
+.editorconfig
+.rnd
+
+# -------------------------------
+# Local DB dumps & backups
+# -------------------------------
+*.sql
+backup.sql
+all_crm_databases.sql
+
+# -------------------------------
+# Logs & Cache
+# -------------------------------
+
+# -------------------------------
+# Docker / CI files not needed in image
+# -------------------------------
+docker-compose*.yml
+Dockerfile*
+docker-compose_run.yml
+docker-compose_mul_bc.yml
+docker-compose1.yml
+Dockerfile_bc
+Dockerfile_mul
+
+# -------------------------------
+# OS / Editor junk
+# -------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# -------------------------------
+# Docs & misc
+# -------------------------------
+README.md
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+APP_NAME="CRM - iHelpKL"
+APP_ENV=production
+APP_KEY=base64:aJ4nwZ10L5TdJ3VWcZDLIZKkN3djtoRLt8ZQugdIYdo=
+APP_DEBUG=false
+APP_URL="http://114.130.69.200"
+
+APP_LOCALE=en
+APP_FALLBACK_LOCALE=en
+APP_FAKER_LOCALE=en_US
+
+APP_MAINTENANCE_DRIVER=file
+# APP_MAINTENANCE_STORE=database
+
+PHP_CLI_SERVER_WORKERS=4
+
+BCRYPT_ROUNDS=12
+
+LOG_CHANNEL=stack
+LOG_STACK=single
+LOG_DEPRECATIONS_CHANNEL=null
+LOG_LEVEL=debug
+
+DB_CONNECTION=mysql
+DB_HOST=db
+DB_PORT=3306
+DB_DATABASE=sass_crm_db_ihelp_2025
+DB_USERNAME=root
+DB_PASSWORD="NeverSharePassword?@2025#"
+
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_PATH=
+SESSION_DOMAIN=
+# SESSION_SECURE_COOKIE=false
+
+BROADCAST_CONNECTION=log
+FILESYSTEM_DISK=local
+QUEUE_CONNECTION=database
+
+CACHE_STORE=database
+# CACHE_PREFIX=
+
+MEMCACHED_HOST=127.0.0.1
+
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+MAIL_FROM_ADDRESS="noreply@ihelpkl.com"
+MAIL_FROM_NAME="${APP_NAME}"
+MAIL_SCHEME=null
+
+## Web Mail Config ##
+MAIL_MAILER=smtp
+MAIL_HOST=ihelpkl.com
+MAIL_USERNAME="${MAIL_FROM_ADDRESS}"
+MAIL_PASSWORD="deNFCZV9c%}x"
+MAIL_PORT=465
+MAIL_ENCRYPTION=tls
+
+# MAIL_MAILER=log
+# MAIL_HOST=127.0.0.1
+# MAIL_PORT=2525
+# MAIL_USERNAME=null
+# MAIL_PASSWORD=null
+
+## Mailtrap Config
+# MAIL_MAILER=smtp
+# MAIL_HOST=sandbox.smtp.mailtrap.io
+# MAIL_PORT=2525
+# MAIL_USERNAME=3614030033f58e
+# MAIL_PASSWORD=e53b8383c6af17
+
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=
+AWS_USE_PATH_STYLE_ENDPOINT=false
+
+VITE_APP_NAME="${APP_NAME}"
+
+
+APP_TIMEZONE=ASIA/DHAKA
+ACTIVITY_LOGGER_DB_CONNECTION=null
+
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+# =====================================
+# STAGE 1: Composer Dependencies
+# =====================================
+FROM composer:2.7 AS builder
+
+WORKDIR /app
+
+COPY composer.json composer.lock ./
+
+# Install ALL deps (Faker needed for tenant seeding)
+RUN composer install \
+    --prefer-dist \
+    --optimize-autoloader \
+    --no-interaction \
+    --no-scripts
+
+COPY . .
+
+# =====================================
+# STAGE 2: PHP Runtime
+# =====================================
+FROM php:8.2-fpm-alpine
+
+WORKDIR /var/www
+
+RUN apk add --no-cache \
+    bash \
+    curl \
+    icu-dev \
+    libzip-dev \
+    oniguruma-dev \
+    mysql-client \
+ && docker-php-ext-install \
+    pdo \
+    pdo_mysql \
+    intl \
+    zip \
+    opcache
+
+# PHP OPCache (performance)
+RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.enable_cli=1" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.memory_consumption=256" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.max_accelerated_files=20000" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/opcache.ini
+ 
+# PHP memory limit
+RUN echo "memory_limit=512M" > /usr/local/etc/php/conf.d/memory.ini
+
+
+COPY --from=builder /app /var/www
+COPY docker/entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /entrypoint.sh \
+ && chown -R www-data:www-data /var/www
+
+USER www-data
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["php-fpm"]
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Docker-compose
+
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+    container_name: saas_crm_ihelp_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RUN_TENANT_SEED: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - saas_crm_ihelp_network
+
+  webserver:
+    image: nginx:1.25-alpine
+    container_name: saas_crm_ihelp_webserver
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - .:/var/www
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - app
+    networks:
+      - saas_crm_ihelp_network
+
+  db:
+    image: mysql:8.0-oraclelinux8
+    container_name: saas_crm_ihelp_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      # MySQL data
+      - saas_crm_ihelp_db_data:/var/lib/mysql
+
+      # ✅ IMPORTANT: mount DIRECTORY, not file
+      - ./mysql-master/conf:/etc/mysql/conf.d
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - saas_crm_ihelp_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: saas_crm_ihelp_redis
+    restart: unless-stopped
+    networks:
+      - saas_crm_ihelp_network
+
+  phpmyadmin:
+    image: phpmyadmin:5.2
+    container_name: saas_crm_ihelp_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+    ports:
+      - "8001:80"
+    depends_on:
+      - db
+    profiles:
+      - debug
+    networks:
+      - saas_crm_ihelp_network
+
+networks:
+  saas_crm_ihelp_network:
+    driver: bridge
+
+volumes:
+  saas_crm_ihelp_db_data:
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+entrypoint
+
+#!/bin/sh
+
+echo "🚀 Starting Laravel container..."
+
+# -------------------------------------------------
+# Wait for MySQL
+# -------------------------------------------------
+echo "⏳ Waiting for database..."
+until php -r "
+new PDO(
+    'mysql:host='.\$_ENV['DB_HOST'].';dbname='.\$_ENV['DB_DATABASE'],
+    \$_ENV['DB_USERNAME'],
+    \$_ENV['DB_PASSWORD']
+);" >/dev/null 2>&1; do
+  sleep 2
+done
+echo "✅ Database connected"
+
+# -------------------------------------------------
+# Create .env if missing
+# -------------------------------------------------
+if [ ! -f .env ]; then
+  echo "📄 Creating .env"
+  cp .env.example .env
+fi
+
+# -------------------------------------------------
+# Generate APP_KEY if missing
+# -------------------------------------------------
+if ! grep -q '^APP_KEY=base64:' .env; then
+  echo "🔑 Generating APP_KEY"
+  php artisan key:generate
+fi
+
+# -------------------------------------------------
+# Fix permissions
+# -------------------------------------------------
+echo "🔐 Fixing permissions"
+chown -R www-data:www-data storage bootstrap/cache
+chmod -R 775 storage bootstrap/cache
+
+# -------------------------------------------------
+# Optimize Laravel
+# -------------------------------------------------
+echo "⚡ Optimizing Laravel"
+php artisan optimize:clear
+php artisan optimize
+
+# -------------------------------------------------
+# Migrate database
+# -------------------------------------------------
+echo "🗄️ Running migrations"
+php artisan migrate --force || true
+
+# -------------------------------------------------
+# Seed tenants (optional)
+# -------------------------------------------------
+if [ "$RUN_TENANT_SEED" = "true" ]; then
+  echo "🌱 Running tenant seeder"
+  yes | php artisan tenant:seed || true
+fi
+
+echo "✅ Laravel ready"
+exec "$@"
+

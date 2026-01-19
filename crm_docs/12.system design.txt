@@ -1,0 +1,1299 @@
+PRIMARY SERVER
+
+114.130.69.249
+
+- Laravel App Containers
+- MySQL (MASTER)
+- Docker Persistent Volume
+- Monthly Volume Backups (2 copies)
+
+│
+
+│ MySQL Replication
+
+▼
+
+SECONDARY SERVER (DR / BACKUP)
+
+114.130.69.223
+
+- MySQL (REPLICA – read-only)
+- Stores Master Volume Backups
+- Takes Regular SQL Dumps
+- NO App Containers
+
+**🔵 MASTER SERVER — 114.130.69.249**
+
+**📦 Volume Backup Policy**
+
+- ✔ **2 times per month**
+    - **Mid-month** (around 15th, after 2:00 AM)
+    - **End-month** (last day, after 2:00 AM)
+- ✔ Backup type: **MySQL Docker persistent volume**
+- ✔ Keep **exactly 2 backups only**
+    - mysql_volume_mid_month.tar.gz
+    - mysql_volume_end_month.tar.gz
+- ✔ Each new backup **overwrites the same slot**
+- ✔ After backup, copy both files to **114.130.69.223/200**
+
+📌 Purpose:
+
+- Fast full restore
+- Hardware / disk failure protection
+
+**🟢 SLAVE SERVER — 114.130.69.223**
+
+**🔁 Replication**
+
+- ✔ Continuous MySQL replication
+- ✔ Read-only mode enabled
+- ✔ No application containers
+
+**📄 SQL Dump Policy (from Replica)**
+
+- ✔ SQL dumps taken **regularly** (daily)
+- ✔ Dump source: **replica (best practice)**
+- ✔ Retention: **last 2 days only**
+- ✔ Older dumps deleted automatically
+- ✔ Latest dump copied back to **master**
+- ✔ Same 2-day retention on master
+
+📌 Purpose:
+
+- Protect against accidental DELETE / UPDATE
+- Recover from bad migrations or bugs
+- Flexible, logical restore
+
+**🎯 SYSTEM GOAL**
+
+Ensure **zero / near-zero data loss**, **fast recovery**, and **automatic handling of multiple tenant databases**, even if the **primary server fails completely**.
+
+**🏗️ SERVER ROLES**
+
+**🔵 PRIMARY (LIVE PRODUCTION)**
+
+**IP:** 114.130.69.249
+
+- Laravel App Containers
+- MySQL **MASTER**
+- Telnet-based SaaS (creates **multiple databases dynamically**)
+- Docker persistent volume
+
+**🟢 SECONDARY (REPLICA + BACKUP)**
+
+**IP:** 114.130.69.223
+
+- MySQL **REPLICA (read-only)**
+- No app containers
+- Stores:
+    - Master volume backups
+    - SQL dumps from replica
+- Backup & cleanup via cron
+
+**🟣 BACKUP PRODUCTION (FAILOVER APP)**
+
+**IP:** 114.130.69.200
+
+| **SSH:** 54658
+
+- Empty standby server
+- Used only when primary fails
+- Runs app containers during failover
+
+**🔁 DATABASE REPLICATION (MULTI-DB SAFE)**
+
+**✔ Replicates:**
+
+- **ALL current and future tenant databases**
+- Databases created dynamically via telnet
+
+**❌ Skips:**
+
+- MySQL system databases only
+
+**🧠 Configuration Logic**
+
+- **No fixed database names**
+- No per-tenant config
+- Automatic inclusion of new DBs
+
+**Slave MySQL ignores:**
+
+- mysql
+- information_schema
+- performance_schema
+- sys
+
+**📦 BACKUP STRATEGY**
+
+**🔵 MASTER SERVER (114.130.69.249)**
+
+**Volume Backups**
+
+- Taken **2 times per month**
+    - Mid-month (after 2:00 AM)
+    - End-month (after 2:00 AM)
+- Keep **exactly 2 backups**
+    - mysql_volume_mid_month.tar.gz
+    - mysql_volume_end_month.tar.gz
+- Each backup overwrites the same slot
+- Latest backups copied to **114.130.69.223**
+
+📌 Purpose: **Fast full recovery from hardware failure**
+
+**🟢 SLAVE SERVER (114.130.69.223)**
+
+**SQL Dumps (from replica)**
+
+- Taken **regularly (daily)**
+- Includes **ALL tenant databases**
+- System DBs excluded
+- Retention: **last 2 days only**
+- Older dumps auto-deleted
+- Latest dump copied back to **master**
+- Same 2-day retention on master
+
+📌 Purpose: **Protection from human error & bad deployments**
+
+**🛡️ DATA SAFETY COVERAGE**
+
+| **Risk** | **Protection** |
+| --- | --- |
+| Hardware failure | Volume backups + replica |
+| Disk crash | Volume backups |
+| Accidental DELETE | SQL dumps |
+| Buggy migration | SQL dumps |
+| Data corruption | SQL dumps |
+| New tenant DBs | Auto-replicated |
+| Fast restore | Volume restore |
+| Flexible rollback | SQL restore |
+
+**🚨 DISASTER RECOVERY (PRIMARY DOWN)**
+
+**Scenario:**
+
+❌ 114.130.69.249 hardware failure
+
+**Recovery Steps:**
+
+1. Promote MySQL on **114.130.69.223** (stop replication, remove read-only)
+2. Restore DB from:
+    - Volume backup (fastest), or
+    - SQL dump (safe fallback)
+3. Deploy app on **114.130.69.200**
+4. Point app DB to **114.130.69.223**
+5. Validate & go live
+
+**⏱️ Recovery Targets:**
+
+- **RPO:** Near zero
+- **RTO:** ~30–45 minutes
+
+**⚠️ CRITICAL RULES (NON-NEGOTIABLE)**
+
+1. ❌ Never back up volume while MySQL is running
+2. ❌ Never allow app writes on replica
+3. ✅ Always keep **2 volume backups**
+4. ✅ Always take SQL dumps from replica
+5. ✅ Always verify backup success before overwrite
+6. ✅ Test restore periodically
+
+**⚖️ PERFORMANCE IMPACT**
+
+| **Component** | **Impact** |
+| --- | --- |
+| Replication | Low |
+| SQL dumps (replica) | Low |
+| Volume backups (2×/month) | Very low |
+| User traffic | No impact |
+
+✔ Safe for production
+
+✔ SaaS-grade
+
+✔ Scales with tenant growth
+
+# PHASE 1 — MASTER DB CONFIGURATION
+
+**Server: 114.130.69.249**
+
+Your DB service:
+
+```yaml
+db:
+image:mysql:8.0-oraclelinux8
+volumes:
+-saas_crm_ihelp_db_data:/var/lib/mysql
+-./mysql-master/conf/my.cnf:/etc/mysql/conf.d/my.cnf
+
+```
+
+## ✅ Step 1.1 — Create Master MySQL Config
+
+Create file:
+
+```bash
+mkdir -p mysql-master/conf
+nano mysql-master/conf/my.cnf
+
+```
+
+Paste:
+
+```
+[mysqld]
+server-id=1
+log-bin=mysql-bin
+binlog_format=ROW
+binlog_row_image=FULL
+
+# Performance & safety
+sync_binlog=1
+innodb_flush_log_at_trx_commit=1
+
+```
+
+---
+
+## ✅ Step 1.2 — Start Containers
+
+```bash
+docker-compose up -d
+
+```
+
+Confirm:
+
+```bash
+docker ps
+
+```
+
+## ✅ Step 1.3 — Create Replication User (Master)
+
+```bash
+dockerexec -it saas_crm_ihelp_db mysql -u root -p
+
+```
+
+```sql
+CREATEUSER'repl'@'%' IDENTIFIEDBY'Repl@Strong123';
+GRANT REPLICATION SLAVEON*.*TO'repl'@'%';
+FLUSH PRIVILEGES;
+
+```
+
+---
+
+## ✅ Step 1.4 — Lock & Capture Binlog Position
+
+```sql
+FLUSH TABLESWITH READ LOCK;
+SHOW MASTER STATUS;
+
+```
+
+📌 **SAVE THESE VALUES**
+
+```
+File: mysql-bin.00000X
+Position: XXXXX
+
+```
+
+⚠️ **Do NOT exit this session yet**
+
+### ✅ Step 1.5: DB BACKUP
+
+# Read password from container env
+
+Your MySQL container already has `MYSQL_ROOT_PASSWORD` set.
+
+### Verify inside container
+
+```bash
+docker exec saas_crm_ihelp_dbenv | grep MYSQL
+
+```
+
+```bash
+docker exec \
+-e MYSQL_PWD="$(docker exec saas_crm_ihelp_db printenv MYSQL_ROOT_PASSWORD)" \
+saas_crm_ihelp_db \
+mysqldump -u root \
+--all-databases \
+--single-transaction \
+--routines \
+--events \
+--triggers \
+--set-gtid-purged=OFF \
+> /root/initial_all_db.sql
+
+```
+
+✅ This works **100%**
+
+✅ No password prompt
+
+✅ Secure (no history leak)
+
+# alternative DB backup Inline password (fastest)
+
+If you want it to work **right now**, do this:
+
+```bash
+dockerexec saas_crm_ihelp_db \
+mysqldump -u root -p'NeverSharePassword?@2025#' \
+--all-databases \
+--single-transaction \
+--routines \
+--events \
+--triggers \
+--set-gtid-purged=OFF \
+> /root/initial_all_db.sql
+
+```
+
+⚠️ Password visible in shell history
+
+⚠️ OK for setup, not ideal long-term
+
+docker exec -it saas_crm_ihelp_db \
+mysqldump -u root -p \
+--all-databases \
+--single-transaction \
+--routines \
+--events \
+--triggers \
+--set-gtid-purged=OFF \
+
+> /root/initial_all_db.sql
+> 
+
+## VERIFY SUCCESS (DO THIS)
+
+```bash
+ls -lh /root/initial_all_db.sql
+
+```
+
+### (ONCE DUMP WORKS)
+
+Immediately after dump succeeds:
+
+```bash
+scp /root/initial_all_db.sql root@114.130.69.223:/root/
+
+```
+
+# REPLICA SETUP
+
+**Server: 114.130.69.223**
+
+---
+
+## ✅ Step 2.1 — MySQL Config (Replica)
+
+```bash
+mkdir -p mysql-slave/conf
+nano mysql-slave/conf/my.cnf
+
+```
+
+```
+[mysqld]
+server-id=2
+relay-log=relay-bin
+read-only=1
+super_read_only=1
+
+# Ignore system DBs only
+replicate-ignore-db=mysql
+replicate-ignore-db=information_schema
+replicate-ignore-db=performance_schema
+replicate-ignore-db=sys
+
+```
+
+## ✅ Step 2.2 Start MySQL Container (Replica Only)
+
+```bash
+docker run -d \
+--name saas_crm_ihelp_db_slave \
+-p 3306:3306 \
+-v saas_crm_ihelp_db_data:/var/lib/mysql \
+-v $(pwd)/mysql-slave/conf/my.cnf:/etc/mysql/conf.d/my.cnf \
+-e MYSQL_ROOT_PASSWORD=NeverSharePassword?@2025# \
+mysql:8.0-oraclelinux8
+
+```
+
+docker run -d \
+--name saas_crm_ihelp_db_slave \
+-p 3306:3306 \
+-v saas_crm_ihelp_db_data:/var/lib/mysql \
+-v $(pwd)/mysql-slave/conf/my.cnf:/etc/mysql/conf.d/my.cnf \
+-e MYSQL_ROOT_PASSWORD=NeverSharePassword?@2025# \
+mysql:8.0-oraclelinux8
+
+## ✅ Step 2.3 USE `MYSQL_PWD` (NO PROMPT, NO ERROR)
+
+Run **exactly this**:
+
+```bash
+docker exec -e MYSQL_PWD='NeverSharePassword?@2025#' \
+-i saas_crm_ihelp_db_slave \
+mysql -u root < /root/initial_all_db.sql
+
+alternative
+
+```
+
+### Why this works
+
+- Password is injected **directly into the container**
+- No interactive prompt needed
+- MySQL receives credentials correctly
+
+✅ This is the **recommended Docker way**
+
+---
+
+# 🔍 VERIFY IMPORT SUCCESS (DO NOT SKIP)
+
+After command finishes (no output = success):
+
+```bash
+docker exec -it saas_crm_ihelp_db_slave mysql -u root -p
+
+```
+
+Enter:
+
+```
+NeverSharePassword?@2025#
+
+```
+
+Then run:
+
+```sql
+SHOW DATABASES;
+
+```
+
+## ✅ Step 2.4 RESET REPLICATION STATE (CLEAN START)
+
+```bash
+dockerexec -it saas_crm_ihelp_db_slave mysql -u root -p
+
+```
+
+Run:
+
+```sql
+STOP SLAVE;
+RESET SLAVEALL;
+
+```
+
+## ✅ Step 2.5 CONFIGURE GTID REPLICATION (NO BINLOG POSITIONS)
+
+Run **exactly this**:
+
+```sql
+CHANGE MASTERTO
+  MASTER_HOST='114.130.69.249',
+  MASTER_USER='repl',
+  MASTER_PASSWORD='Repl@Strong123',
+  MASTER_AUTO_POSITION=1;
+
+```
+
+## START REPLICATION
+
+```sql
+START SLAVE;
+
+```
+
+## VERIFY REPLICATION (FINISH LINE)
+
+```sql
+SHOW SLAVE STATUS\G
+
+```
+
+## RE-ENABLE READ-ONLY PROTECTION (IMPORTANT)
+
+```sql
+SETGLOBAL read_only=ON;
+SETGLOBAL super_read_only=ON;
+EXIT;
+
+```
+
+## CREATE A TEST DATABASE ON MASTER
+
+📍 **Run on MASTER server** (`114.130.69.249`)
+
+📍 Container: `saas_crm_ihelp_db`
+
+```bash
+dockerexec -it saas_crm_ihelp_db mysql -u root -p
+
+```
+
+Enter the MySQL root password, then run:
+
+```sql
+CREATE DATABASE replication_test_ok;
+EXIT;
+
+```
+
+✔ This writes data on the master
+
+✔ GTID will replicate it automatically
+
+---
+
+## ✅ Step 2.6 CHECK ON SLAVE (READ ONLY)
+
+📍 **Run on SLAVE server** (`114.130.69.223`)
+
+📍 Container: `saas_crm_ihelp_db_slave`
+
+```bash
+dockerexec -it saas_crm_ihelp_db_slave mysql -u root -p
+
+```
+
+Then run:
+
+```sql
+SHOW DATABASESLIKE'replication_test_ok';
+
+```
+
+# ✅ Step 3 VOLUME BACKUP (MASTER)
+
+**2× per month after 2 AM**
+
+---
+
+## LOGIN TO THE SERVER
+
+### On MASTER:
+
+```bash
+ssh root@114.130.69.249
+
+```
+
+### On SLAVE:
+
+```bash
+ssh root@114.130.69.223
+
+```
+
+(Do this one server at a time.)
+
+---
+
+## ✅ Step 3.2 — CREATE THE DIRECTORY
+
+Run this command:
+
+```bash
+mkdir -p /backup_volume/mysql
+
+```
+
+### What this does
+
+- `backup_volume` → created if not exists
+- `mysql` → created inside it
+- `p` → no error if it already exists
+
+---
+
+## ✅ STEP 3.3 — SET SECURE PERMISSIONS
+
+```bash
+chmod 700 /backup_volume/mysql
+
+```
+
+This ensures:
+
+- Only `root` can read/write
+- Backups are protected
+
+---
+
+## ✅ STEP 3.4 — VERIFY DIRECTORY EXISTS
+
+```bash
+ls -ld /backup_volume/mysql
+
+```
+
+### Expected output:
+
+```
+drwx------ 2 root root ... /backup_volume/mysql
+
+```
+
+✅ This confirms the directory is created correctly.
+
+---
+
+## — (OPTIONAL) TEST FILE CREATION
+
+You can test writing to it:
+
+```bash
+touch /backup_volume/mysql/test_file
+ls -lh /backup_volume/mysql
+rm /backup_volume/mysql/test_file
+
+```
+
+If this works → permissions are correct.
+
+## ✅ Step 3.5 — Backup Script (Master)
+
+```bash
+nano /usr/local/bin/mysql_volume_backup.sh
+
+```
+
+```bash
+#!/bin/bash
+set -e
+
+# DIRECTORIES
+MASTER_BACKUP_DIR="/backup_volume/mysql"
+SLAVE_BACKUP_DIR="/backup_volume/mysql"
+
+# MYSQL
+CONTAINER="saas_crm_ihelp_db"
+VOLUME_PATH="/var/lib/docker/volumes/saas-crm-ihelp_saas_crm_ihelp_db_data/_data"
+
+# SLAVE
+SLAVE_USER="root"
+SLAVE_IP="114.130.69.223"
+
+DAY=$(date +%d)
+
+# Decide backup name (2 copies only)
+if [ "$DAY" -le 15 ]; then
+  BACKUP_NAME="mysql_volume_mid_month.tar.gz"
+else
+  BACKUP_NAME="mysql_volume_end_month.tar.gz"
+fi
+
+echo "📦 Starting MySQL volume backup: $BACKUP_NAME"
+
+# Stop MySQL safely
+docker stop $CONTAINER
+
+# Create volume backup
+tar -czf "$MASTER_BACKUP_DIR/$BACKUP_NAME" -C "$VOLUME_PATH" .
+
+# Start MySQL again
+docker start $CONTAINER
+
+echo "📤 Copying backup to slave server..."
+
+# Copy to slave (same directory & filename)
+scp "$MASTER_BACKUP_DIR/$BACKUP_NAME" \
+"$SLAVE_USER@$SLAVE_IP:$SLAVE_BACKUP_DIR/$BACKUP_NAME"
+
+echo "✅ Volume backup completed successfully"
+
+```
+
+```bash
+chmod +x /usr/local/bin/mysql_volume_backup.sh
+
+```
+
+---
+
+# FINAL TEST (THIS WILL NOW WORK)
+
+Run again:
+
+```bash
+/usr/local/bin/mysql_volume_backup.sh
+
+```
+
+# VERIFY BACKUPS (BOTH SERVERS)
+
+### On MASTER
+
+```bash
+ls -lh /backup_volume/mysql
+
+```
+
+### On SLAVE
+
+```bash
+ssh root@114.130.69.223"ls -lh /backup_volume/mysql"
+
+```
+
+## ✅ Step 3.6 — Cron
+
+```bash
+crontab -e
+
+```
+
+```
+Add:
+
+# Mid-month MySQL volume backup (15th @ 02:00)
+0 2 15 * * /usr/local/bin/mysql_volume_backup.sh
+
+# End-month MySQL volume backup (28–31 @ 02:00)
+0 2 28-31 * * /usr/local/bin/mysql_volume_backup.sh
+
+```
+
+---
+
+# ✅ Step 3.8 RESTORE (WHEN REQUIRED)
+
+## 🧯 RESTORE ON ANY SERVER
+
+```bash
+docker stop saas_crm_ihelp_db
+
+rm -rf /var/lib/docker/volumes/saas_crm_ihelp_db_data/_data/*
+
+tar -xzf mysql_volume_mid_month.tar.gz \
+-C /var/lib/docker/volumes/saas_crm_ihelp_db_data/_data
+
+chown -R 999:999 /var/lib/docker/volumes/saas_crm_ihelp_db_data/_data
+
+docker start saas_crm_ihelp_db
+
+```
+
+# ✅ Step 4.1 CREATE MYSQL BACKUP SCRIPT (NO VOLUME)
+
+# CREATE BACKUP DIRECTORY (HOST)
+
+```bash
+ssh root@114.130.69.249
+mkdir -p /backup/mysql
+chmod 700 /backup/mysql
+
+```
+
+Create script:
+
+```bash
+nano /usr/local/bin/mysql_sql_backup.sh
+
+```
+
+**MASTER server (114.130.69.249)**
+
+📍 File: `/usr/local/bin/mysql_sql_backup.sh`
+
+```bash
+#!/bin/bash
+set -e
+
+BACKUP_DIR="/backup/mysql"
+DAY=$(date +%d)
+
+CONTAINER="saas_crm_ihelp_db"
+MYSQL_PWD="NeverSharePassword?@2025#"
+
+SLAVE_USER="root"
+SLAVE_IP="114.130.69.223"
+SLAVE_DIR="/backup/mysql"
+
+# Decide backup name (keep only 2 copies)
+if ["$DAY" -le 15 ];then
+  BACKUP_NAME="mysql_dump_mid_month.sql.gz"
+else
+  BACKUP_NAME="mysql_dump_end_month.sql.gz"
+fi
+
+echo"📄 Starting MySQL logical backup: $BACKUP_NAME"
+
+# Take SQL backup
+dockerexec -e MYSQL_PWD="$MYSQL_PWD"$CONTAINER \
+mysqldump -u root \
+--all-databases \
+--single-transaction \
+--quick \
+--routines \
+--events \
+--triggers \
+--set-gtid-purged=ON \
+| gzip >"$BACKUP_DIR/$BACKUP_NAME"
+
+echo"📤 Copying backup to slave server..."
+
+# Copy to slave (overwrite same file)
+scp"$BACKUP_DIR/$BACKUP_NAME" \
+"$SLAVE_USER@$SLAVE_IP:$SLAVE_DIR/$BACKUP_NAME"
+
+echo"✅ Backup completed and copied successfully"
+
+```
+
+Save and exit.
+
+# MAKE SCRIPT EXECUTABLE (IF NOT DONE)
+
+```bash
+chmod +x /usr/local/bin/mysql_sql_backup.sh
+
+```
+
+# TEST MANUALLY (VERY IMPORTANT)
+
+Run:
+
+```bash
+/usr/local/bin/mysql_sql_backup.sh
+
+```
+
+# ✅ Step 4.5 SET CRON (2× PER MONTH)
+
+Edit cron:
+
+```bash
+crontab -e
+
+```
+
+Add:
+
+```
+# Mid-month SQL backup (15th at 02:00 AM)
+0 2 15 * * /usr/local/bin/mysql_sql_backup.sh
+
+# End-month SQL backup (28–31 at 02:00 AM)
+0 2 28-31 * * /usr/local/bin/mysql_sql_backup.sh
+
+```
+
+# ✅ Step 4.6 HOW TO RESTORE (WHEN NEEDED)
+
+### Restore on ANY server:
+
+```bash
+gunzip mysql_dump_mid_month.sql.gz
+dockerexec -i saas_crm_ihelp_db \
+mysql -u root -p < mysql_dump_mid_month.sql
+
+```
+
+# CREATE BACKUP DIRECTORY (ONLY ONCE)
+
+Run this on the **SLAVE server**:
+
+```bash
+mkdir -p /backup/mysql
+
+```
+
+Set secure permissions:
+
+```bash
+chmod 700 /backup/mysql
+
+```
+
+Verify:
+
+```bash
+ls -ld /backup/mysql
+
+```
+
+Expected output:
+
+```
+drwx------ 2 root root ... /backup/mysql
+
+```
+
+# VERIFY FILE EXISTS ON SLAVE
+
+From **MASTER**, run:
+
+```bash
+ssh root@114.130.69.223"ls -lh /backup/mysql"
+
+```
+
+cd /backup/mysql
+
+# ✅ Step 5.1 MYSQL LOGICAL DUMP FROM SLAVE → MASTER
+
+### (Directory: `sql_slave`)
+
+---
+
+## 🧭 DIRECTORY STANDARD (IMPORTANT)
+
+| Server | Directory |
+| --- | --- |
+| SLAVE (`114.130.69.223`) | `/sql_slave` |
+| MASTER (`114.130.69.249`) | `/sql_slave` |
+
+👉 Same directory name on both servers.
+
+---
+
+# 🔵 PART A — PREPARE DIRECTORIES
+
+## ✅ Step 5.2 — CREATE DIRECTORY ON SLAVE
+
+```bash
+ssh root@114.130.69.223
+mkdir -p /sql_slave
+chmod 700 /sql_slave
+ls -ld /sql_slave
+exit
+
+```
+
+---
+
+## ✅ Step 5.3 — CREATE DIRECTORY ON MASTER
+
+```bash
+ssh root@114.130.69.249
+mkdir -p /sql_slave
+chmod 700 /sql_slave
+ls -ld /sql_slave
+
+```
+
+---
+
+# 🔑 PART B — PASSWORDLESS SSH (ONE-TIME)
+
+On **SLAVE**, allow copy to MASTER:
+
+```bash
+ssh-copy-id root@114.130.69.249
+
+```
+
+Test:
+
+```bash
+ssh root@114.130.69.249"echo SSH_OK"
+
+```
+
+You must see:
+
+```
+SSH_OK
+
+```
+
+---
+
+# ✅ Step 5.4 — CREATE DUMP SCRIPT (SLAVE)
+
+## — CREATE SCRIPT FILE
+
+📍 **SLAVE server**
+
+```bash
+nano /usr/local/bin/mysql_dump_slave.sh
+
+```
+
+---
+
+## — PASTE THIS **FINAL & CORRECT SCRIPT**
+
+```bash
+#!/bin/bash
+set -e
+
+# DIRECTORIES
+BACKUP_DIR="/sql_slave"
+DATE=$(date +%F)
+BACKUP_NAME="all_db_${DATE}.sql.gz"
+
+# MYSQL
+CONTAINER="saas_crm_ihelp_db_slave"
+MYSQL_PWD="NeverSharePassword?@2025#"
+
+# MASTER DETAILS
+MASTER_USER="root"
+MASTER_IP="114.130.69.249"
+MASTER_DIR="/sql_slave"
+
+echo"📄 Starting MySQL dump on SLAVE: $BACKUP_NAME"
+
+# Take logical dump (safe on replica)
+dockerexec -e MYSQL_PWD="$MYSQL_PWD"$CONTAINER \
+mysqldump -u root \
+--all-databases \
+--single-transaction \
+--quick \
+--routines \
+--events \
+--triggers \
+--set-gtid-purged=OFF \
+| gzip >"$BACKUP_DIR/$BACKUP_NAME"
+
+echo"🧹 Cleaning old dumps (keep last 2 only)"
+ls -1t$BACKUP_DIR/*.sql.gz |tail -n +3 | xargs -rrm -f
+
+echo"📤 Copying dump to MASTER server"
+scp"$BACKUP_DIR/$BACKUP_NAME" \
+"$MASTER_USER@$MASTER_IP:$MASTER_DIR/$BACKUP_NAME"
+
+echo"✅ Slave MySQL dump completed successfully"
+
+```
+
+Save & exit.
+
+---
+
+## — MAKE SCRIPT EXECUTABLE
+
+```bash
+chmod +x /usr/local/bin/mysql_dump_slave.sh
+
+```
+
+---
+
+# ✅ Step 5.5 — MANUAL TEST (MANDATORY)
+
+ — RUN SCRIPT MANUALLY (SLAVE)
+
+```bash
+/usr/local/bin/mysql_dump_slave.sh
+
+```
+
+### Expected output:
+
+```
+📄 Starting MySQL dumpon SLAVE: all_db_YYYY-MM-DD.sql.gz
+🧹 Cleaningold dumps (keep last2only)
+📤 Copying dumpto MASTERserver
+✅ Slave MySQL dump completed successfully
+
+```
+
+---
+
+## — VERIFY ON SLAVE
+
+```bash
+ls -lh /sql_slave
+
+```
+
+You should see:
+
+```
+all_db_YYYY-MM-DD.sql.gz
+
+```
+
+---
+
+## — VERIFY ON MASTER
+
+```bash
+ssh root@114.130.69.249"ls -lh /sql_slave"
+
+```
+
+You should see **the same file**:
+
+```
+all_db_YYYY-MM-DD.sql.gz
+
+```
+
+✅ This confirms **copy worked correctly**.
+
+---
+
+## ✅ Step 5.6— VERIFY DUMP CONTENT (OPTIONAL BUT STRONG TEST)
+
+On **either server**:
+
+```bash
+gunzip -c /sql_slave/all_db_YYYY-MM-DD.sql.gz |head -20
+
+```
+
+You should see:
+
+```sql
+-- MySQL dump
+-- Server version 8.0.x
+
+```
+
+---
+
+# ✅ Step 5.7 — AUTOMATION (CRON)
+
+## — SET CRON ON SLAVE
+
+```bash
+crontab -e
+
+```
+
+Add:
+
+```
+# Daily MySQL dump from SLAVE at 01:00 AM
+0 1 * * * /usr/local/bin/mysql_dump_slave.sh
+
+```
+
+# — PREPARE MYSQL FOR RESTORE
+
+## ✅ Step 5.8 — STOP APPLICATION CONTAINERS (MASTER)
+
+We want **NO writes during restore**.
+
+```bash
+docker-compose stop app webserver redis
+
+```
+
+✔ MySQL stays running
+
+✔ No new data written
+
+---
+
+## — DISABLE READ-ONLY (IF ENABLED)
+
+```bash
+dockerexec -it saas_crm_ihelp_db mysql -u root -p
+
+```
+
+```sql
+SETGLOBAL super_read_only= OFF;
+SETGLOBAL read_only= OFF;
+EXIT;
+
+```
+
+---
+
+# ✅ Step 5.9— RESTORE DATABASE
+
+## — RESTORE SQL DUMP (CORE STEP)
+
+```bash
+gunzip -c /sql_slave/all_db_2026-01-19.sql.gz | \
+dockerexec -i saas_crm_ihelp_db mysql -u root -p
+
+```
+
+📌 Enter MySQL root password when prompted.
+
+### ⏳ What happens
+
+- All databases are recreated
+- Tables, data, triggers, routines restored
+- Tenants restored automatically
+
+(No output = success ✅)
+
+---
+
+## — VERIFY DATABASES AFTER RESTORE
+
+```bash
+dockerexec -it saas_crm_ihelp_db mysql -u root -p -e"SHOW DATABASES;"
+
+```
+
+Confirm:
+
+- Main CRM database exists
+- All tenant databases exist
+
+---
+
+# — POST-RESTORE SAFETY
+
+— RE-ENABLE READ-ONLY (IF THIS IS A REPLICA)
+
+⚠️ **Do this ONLY if MASTER is acting as replica**
+
+```bash
+dockerexec -it saas_crm_ihelp_db mysql -u root -p
+
+```
+
+```sql
+SETGLOBAL read_only=ON;
+SETGLOBAL super_read_only=ON;
+EXIT;
+
+```
+
+---
+
+## START APPLICATION CONTAINERS
+
+```bash
+docker-compose up -d app webserver redis
+
+```
+
+---
+
+# Final— CONFIRM RESTORE SUCCESS
+
+## — APPLICATION TEST
+
+- Open CRM UI
+- Login
+- Check:
+    - Tenants
+    - Leads
+    - Call logs
+    - Recent data
+
+---
+
+## ✅— DATABASE SANITY CHECK (OPTIONAL)
+
+```bash
+dockerexec -it saas_crm_ihelp_db mysql -u root -p -e "
+SELECT COUNT(*) FROM information_schema.tables;
+"
+
+```
+
+Non-zero result = healthy DB ✅

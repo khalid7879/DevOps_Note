@@ -234,3 +234,8 @@ Expected:
 
 HTTP/1.1 200 OK
 
+DATABASE
+docker exec -it saas_crm_ihelp_app php artisan migrate --force
+
+TENANT SEEDING (NO --force)
+yes | docker exec -i saas_crm_ihelp_app php artisan tenant:seed
