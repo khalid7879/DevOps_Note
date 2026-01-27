@@ -239,3 +239,11 @@ docker exec -it saas_crm_ihelp_app php artisan migrate --force
 
 TENANT SEEDING (NO --force)
 yes | docker exec -i saas_crm_ihelp_app php artisan tenant:seed
+
+scp -r saas-crm-ihelp root@114.130.69.249:/var/www/html/
+
+docker compose exec app php artisan migrate:fresh --seed
+
+yes | docker exec -i naafco_crm_ihelp_app php artisan tenant:seed
+
+naafco_crm_db_ihelp_2026

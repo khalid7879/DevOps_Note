@@ -540,7 +540,7 @@ EXIT;
 📍 Container: `saas_crm_ihelp_db`
 
 ```bash
-dockerexec -it saas_crm_ihelp_db mysql -u root -p
+docker exec -it saas_crm_ihelp_db mysql -u root -p
 
 ```
 
@@ -1251,7 +1251,7 @@ Confirm:
 ⚠️ **Do this ONLY if MASTER is acting as replica**
 
 ```bash
-dockerexec -it saas_crm_ihelp_db mysql -u root -p
+docker exec -it saas_crm_ihelp_db mysql -u root -p
 
 ```
 
@@ -1290,7 +1290,7 @@ docker-compose up -d app webserver redis
 ## ✅— DATABASE SANITY CHECK (OPTIONAL)
 
 ```bash
-dockerexec -it saas_crm_ihelp_db mysql -u root -p -e "
+docker exec -it saas_crm_ihelp_db mysql -u root -p -e "
 SELECT COUNT(*) FROM information_schema.tables;
 "
 

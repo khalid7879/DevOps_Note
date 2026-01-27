@@ -1,3 +1,8 @@
+docker stop $(docker ps -aq)
+docker system prune -a --volumes -f
+docker compose up -d --build
+docker volume rm $(docker volume ls -q)
+
 delete
 docker stop $(docker ps -aq)
 docker rm $(docker ps -aq)
