@@ -247,3 +247,5 @@ docker compose exec app php artisan migrate:fresh --seed
 yes | docker exec -i naafco_crm_ihelp_app php artisan tenant:seed
 
 naafco_crm_db_ihelp_2026
+
+chmod +x entrypoint.sh
