@@ -97,3 +97,163 @@ ENTRYPOINT ["/entrypoint.sh"]
 CMD ["php-fpm"]
 -------------------------------
 
+version: "3.9"
+
+networks:
+  saas_crm_ihelp_network:
+    driver: bridge
+
+volumes:
+  saas_crm_ihelp_db_data:
+  grafana_data:
+  prometheus_data:
+
+services:
+  # --------------------------------------------------
+  # Laravel Application
+  # --------------------------------------------------
+  app:
+    build:
+      context: .
+    container_name: saas_crm_ihelp_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RUN_TENANT_SEED: "false"   # enable only once when needed
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # Nginx Web Server
+  # --------------------------------------------------
+  webserver:
+    image: nginx:1.25-alpine
+    container_name: saas_crm_ihelp_webserver
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - .:/var/www
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - app
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # MySQL Database
+  # --------------------------------------------------
+  db:
+    image: mysql:8.0-oraclelinux8
+    container_name: saas_crm_ihelp_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+    volumes:
+      - saas_crm_ihelp_db_data:/var/lib/mysql
+      - ./mysql-master/conf/my.cnf:/etc/mysql/conf.d/my.cnf
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # Redis
+  # --------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: saas_crm_ihelp_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # cAdvisor (Docker Container Metrics)
+  # --------------------------------------------------
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # Node Exporter (Host / VM Metrics)
+  # --------------------------------------------------
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "9100:9100"
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # Prometheus
+  # --------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - cadvisor
+      - node-exporter
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # Grafana
+  # --------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - saas_crm_ihelp_network
