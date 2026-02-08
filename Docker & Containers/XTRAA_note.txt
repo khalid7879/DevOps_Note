@@ -1,0 +1,11 @@
+https://www.youtube.com/watch?v=bKFMS5C4CG0.  docker network
+
+⬜ Resource limits (CPU/memory)
+
+https://www.youtube.com/watch?v=2AvcRHADSAQ
+
+https://www.youtube.com/watch?v=w1GH-vE8Vac
+
+⬜ Docker stats & inspect
+
+docker stats --no-stream
