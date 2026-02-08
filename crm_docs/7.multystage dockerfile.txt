@@ -388,3 +388,5 @@ time curl -o /dev/null http://localhost
 🧠 STEP 10: DEBUG TOOLS (WHEN NEEDED)
 docker-compose --profile debug up -d phpmyadmin
 docker-compose stop phpmyadmin
+
+https://www.youtube.com/watch?v=vHBHxQfK6cM

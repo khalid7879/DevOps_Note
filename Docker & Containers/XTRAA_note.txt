@@ -9,3 +9,7 @@ https://www.youtube.com/watch?v=w1GH-vE8Vac
 ⬜ Docker stats & inspect
 
 docker stats --no-stream
+
+Security 
+
+https://www.youtube.com/watch?v=9xz9sBjZwXs
