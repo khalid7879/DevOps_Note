@@ -13,3 +13,12 @@ docker stats --no-stream
 Security 
 
 https://www.youtube.com/watch?v=9xz9sBjZwXs
+
+⬜ Debug containner
+
+https://www.youtube.com/watch?v=YRt1aB0iAlM
+
+⬜ harden practice docker
+
+environment variables docker
+
