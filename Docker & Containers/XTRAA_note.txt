@@ -22,3 +22,6 @@ https://www.youtube.com/watch?v=YRt1aB0iAlM
 
 environment variables docker
 
+Docker Full course
+https://www.youtube.com/watch?v=9bSbNNH4Nqw
+
