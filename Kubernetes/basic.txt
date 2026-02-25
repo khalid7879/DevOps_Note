@@ -1,0 +1,15 @@
+Docker build 
+kubernetis deploy
+Auto scaling /heal
+replica 
+
+kubectl
+sceduler
+etcd
+controller manager
+Api server
+
+
+kubelet
+pod
+proxy server
