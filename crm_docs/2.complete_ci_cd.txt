@@ -1,1 +1,70 @@
+git init 
+git config --global user.name "khalid7879"
+git config --global user.email "khalidhasantalukder5@gmail.com"
+
+Now Verify
+git config --global --list
+git add .
+git commit -m "Initial commit"
+git remote add origin https://github.com/khalid7879/crm.git
+git branch -M main
+git push -u origin main
+
+set git repo secret:-
+================================================================
+
+Go to:
+
+GitHub →
+CRM repo →
+Settings → Secrets → Actions → New repository secret
+Name:
+SSH_PRIVATE_KEY
+Add
+
+✅ STEP-BY-STEP FIX (Do This Exactly)
+✅ 1️⃣ Regenerate Proper Key (On Your Local Machine)
+
+On your local system:
+
+ssh-keygen -t ed25519 -C "github-deploy"
+
+When prompted:
+
+Enter file: ~/.ssh/id_ed25519_249
+
+Press enter for no passphrase.
+
+✅ 2️⃣ Copy the FULL Private Key
+
+Run:
+
+cat ~/.ssh/id_ed25519_249
+
+It MUST look like this:
+
+-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAA...
+....
+-----END OPENSSH PRIVATE KEY-----
+
+Copy everything including BEGIN and END lines.
+
+✅ 3️⃣ Add Public Key to Server
+cat ~/.ssh/id_ed25519_249.pub
+
+Copy output.
+
+Then on your server:
+
+mkdir -p ~/.ssh
+nano ~/.ssh/authorized_keys
+
+Paste the public key inside.
+
+Then:
+
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+
 
