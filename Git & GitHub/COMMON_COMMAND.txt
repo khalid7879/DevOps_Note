@@ -141,3 +141,7 @@ git push origin feature-branch
 git help
 git help commit
 git commit --help
+
+🔹 21. Reset 
+git reset --hard Commit no
+git push origin main --force
