@@ -1,1 +1,263 @@
+networks:
+  saas_crm_ihelp_network:
+    driver: bridge
+
+volumes:
+  saas_crm_ihelp_db_data:
+
+services:
+  # --------------------------------------------------
+  # Laravel Application
+  # --------------------------------------------------
+  app:
+    build:
+      context: .
+    container_name: saas_crm_ihelp_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RUN_TENANT_SEED: "true" # enable only once when needed
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # Nginx Web Server
+  # --------------------------------------------------
+  webserver:
+    image: nginx:1.25-alpine
+    container_name: saas_crm_ihelp_webserver
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - .:/var/www
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - app
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # MySQL Database
+  # --------------------------------------------------
+  db:
+    image: mysql:8.0-oraclelinux8
+    container_name: saas_crm_ihelp_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+    volumes:
+      - saas_crm_ihelp_db_data:/var/lib/mysql
+      - ./mysql-master/conf/my.cnf:/etc/mysql/conf.d/my.cnf
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - saas_crm_ihelp_network
+
+
+-------==========================================================================
+
+# =====================================
+# STAGE 1: Composer Dependencies
+# =====================================
+FROM composer:2.7 AS builder
+
+WORKDIR /app
+
+COPY composer.json composer.lock ./
+
+# Install ALL deps (Faker needed for tenant seeding)
+RUN composer install \
+    --prefer-dist \
+    --optimize-autoloader \
+    --no-interaction \
+    --no-scripts
+
+COPY . .
+
+# =====================================
+# STAGE 2: PHP Runtime
+# =====================================
+FROM php:8.2-fpm-alpine
+
+WORKDIR /var/www
+
+RUN apk add --no-cache \
+    bash \
+    curl \
+    icu-dev \
+    libzip-dev \
+    oniguruma-dev \
+    mysql-client \
+ && docker-php-ext-install \
+    pdo \
+    pdo_mysql \
+    intl \
+    zip \
+    opcache
+
+# PHP OPCache (performance)
+RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.enable_cli=1" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.memory_consumption=256" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.max_accelerated_files=20000" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/opcache.ini
+ 
+# PHP memory limit
+RUN echo "memory_limit=1024M" > /usr/local/etc/php/conf.d/memory.ini
+
+
+COPY --from=builder /app /var/www
+COPY docker/entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /entrypoint.sh \
+ && chown -R www-data:www-data /var/www
+
+USER www-data
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["php-fpm"]
+
+
+
+=================================================================================================
+
+#!/bin/sh
+
+echo "🚀 Starting Laravel container..."
+
+# -------------------------------------------------
+# Wait for MySQL
+# -------------------------------------------------
+echo "⏳ Waiting for database..."
+until php -r "
+new PDO(
+    'mysql:host='.\$_ENV['DB_HOST'].';dbname='.\$_ENV['DB_DATABASE'],
+    \$_ENV['DB_USERNAME'],
+    \$_ENV['DB_PASSWORD']
+);" >/dev/null 2>&1; do
+  sleep 2
+done
+echo "✅ Database connected"
+
+# -------------------------------------------------
+# Create .env if missing
+# -------------------------------------------------
+if [ ! -f .env ]; then
+  echo "📄 Creating .env"
+  cp .env.example .env
+fi
+
+# -------------------------------------------------
+# Generate APP_KEY if missing
+# -------------------------------------------------
+if ! grep -q '^APP_KEY=base64:' .env; then
+  echo "🔑 Generating APP_KEY"
+  php artisan key:generate
+fi
+
+# -------------------------------------------------
+# Fix permissions
+# -------------------------------------------------
+echo "🔐 Fixing permissions"
+chown -R www-data:www-data storage bootstrap/cache
+chmod -R 775 storage bootstrap/cache
+
+# -------------------------------------------------
+# Optimize Laravel
+# -------------------------------------------------
+echo "⚡ Optimizing Laravel"
+php artisan optimize:clear
+php artisan optimize
+
+# -------------------------------------------------
+# Migrate database
+# -------------------------------------------------
+echo "🗄️ Running migrations"
+php artisan migrate --force || true
+
+# -------------------------------------------------
+# Seed tenants (optional)
+# -------------------------------------------------
+if [ "$RUN_TENANT_SEED" = "true" ]; then
+  echo "🌱 Running tenant seeder"
+  yes | php artisan tenant:seed || true
+fi
+
+echo "✅ Laravel ready"
+exec "$@"
+
+=====================================================
+
+name: 🚀 Deploy to PROD Server
+
+on:
+  push:
+    branches:
+      - main # Change this if you're using a different branch
+
+jobs:
+  deploy:
+    name: Deploy App to CentOS via SSH
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up SSH Connection
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519_249 
+        
+          chmod 600 ~/.ssh/id_ed25519_249
+          ssh-keyscan -p 6072 -H 114.130.69.249 >> ~/.ssh/known_hosts
+
+      - name: Deploy to Server
+        run: |
+          ssh -i ~/.ssh/id_ed25519_249 -p 6072 root@114.130.69.249<< 'EOF'
+            echo "Connected to CentOS server"
+
+            # Navigate to your project directory
+
+            cd /var/www/html
+
+            # If folder doesn't exist, clone it fresh (use your actual repo)
+
+            if [ ! -d "crm/.git" ]; then
+              rm -rf crm
+              git clone -b main git@github.com:khalid7879/crm.git crm
+            else
+              cd crm
+              git pull origin main  
+            fi
+
+            cd crm
+
+            # Pull latest changes from GitHub
+            git pull origin main
+
+            # Optional: Add your build/deploy steps below
+            # npm install
+            # npm run build
+            # composer install --optimize-autoloader
+            # php artisan migrate --force
+            # systemctl restart nginx
+            # systemctl restart php-fpm
+
+            echo "Code deployed successful done"
+
+
 
