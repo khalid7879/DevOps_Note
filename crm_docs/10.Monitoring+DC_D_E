@@ -1,0 +1,303 @@
+version: "3.9"
+
+networks:
+  saas_crm_ihelp_network:
+    driver: bridge
+
+volumes:
+  saas_crm_ihelp_db_data:
+  grafana_data:
+  prometheus_data:
+
+services:
+  # --------------------------------------------------
+  # Laravel Application
+  # --------------------------------------------------
+  app:
+    build:
+      context: .
+    container_name: saas_crm_ihelp_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RUN_TENANT_SEED: "false"   # enable only once when needed
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # Nginx Web Server
+  # --------------------------------------------------
+  webserver:
+    image: nginx:1.25-alpine
+    container_name: saas_crm_ihelp_webserver
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - .:/var/www
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - app
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # MySQL Database
+  # --------------------------------------------------
+  db:
+    image: mysql:8.0-oraclelinux8
+    container_name: saas_crm_ihelp_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+    volumes:
+      - saas_crm_ihelp_db_data:/var/lib/mysql
+      - ./mysql-master/conf/my.cnf:/etc/mysql/conf.d/my.cnf
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # Redis
+  # --------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: saas_crm_ihelp_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # cAdvisor (Docker Container Metrics)
+  # --------------------------------------------------
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # Node Exporter (Host / VM Metrics)
+  # --------------------------------------------------
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "9100:9100"
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # Prometheus
+  # --------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - cadvisor
+      - node-exporter
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # Grafana
+  # --------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_HOST=smtp.gmail.com:587
+      - GF_SMTP_USER=tahsinruhanirezita@gmail.com
+      - GF_SMTP_PASSWORD=anqsbrjczjbzsqwy
+      - GF_SMTP_FROM_ADDRESS=tahsinruhanirezita@gmail.com
+      - GF_SMTP_FROM_NAME=Grafana Alerts
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - saas_crm_ihelp_network
+
+
+-------==========================================================================
+
+# =====================================
+# STAGE 1: Composer Dependencies
+# =====================================
+FROM composer:2.7 AS builder
+
+WORKDIR /app
+
+COPY composer.json composer.lock ./
+
+# Install ALL deps (Faker needed for tenant seeding)
+RUN composer install \
+    --prefer-dist \
+    --optimize-autoloader \
+    --no-interaction \
+    --no-scripts
+
+COPY . .
+
+# =====================================
+# STAGE 2: PHP Runtime
+# =====================================
+FROM php:8.2-fpm-alpine
+
+WORKDIR /var/www
+
+RUN apk add --no-cache \
+    bash \
+    curl \
+    icu-dev \
+    libzip-dev \
+    oniguruma-dev \
+    mysql-client \
+ && docker-php-ext-install \
+    pdo \
+    pdo_mysql \
+    intl \
+    zip \
+    opcache
+
+# PHP OPCache (performance)
+RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.enable_cli=1" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.memory_consumption=256" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.max_accelerated_files=20000" >> /usr/local/etc/php/conf.d/opcache.ini \
+ && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/opcache.ini
+ 
+# PHP memory limit
+RUN echo "memory_limit=1024M" > /usr/local/etc/php/conf.d/memory.ini
+
+
+COPY --from=builder /app /var/www
+COPY docker/entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /entrypoint.sh \
+ && chown -R www-data:www-data /var/www
+
+USER www-data
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["php-fpm"]
+
+
+
+=================================================================================================
+
+#!/bin/sh
+
+echo "🚀 Starting Laravel container..."
+
+# -------------------------------------------------
+# Wait for MySQL
+# -------------------------------------------------
+echo "⏳ Waiting for database..."
+until php -r "
+new PDO(
+    'mysql:host='.\$_ENV['DB_HOST'].';dbname='.\$_ENV['DB_DATABASE'],
+    \$_ENV['DB_USERNAME'],
+    \$_ENV['DB_PASSWORD']
+);" >/dev/null 2>&1; do
+  sleep 2
+done
+echo "✅ Database connected"
+
+# -------------------------------------------------
+# Create .env if missing
+# -------------------------------------------------
+if [ ! -f .env ]; then
+  echo "📄 Creating .env"
+  cp .env.example .env
+fi
+
+# -------------------------------------------------
+# Generate APP_KEY if missing
+# -------------------------------------------------
+if ! grep -q '^APP_KEY=base64:' .env; then
+  echo "🔑 Generating APP_KEY"
+  php artisan key:generate
+fi
+
+# -------------------------------------------------
+# Fix permissions
+# -------------------------------------------------
+echo "🔐 Fixing permissions"
+chown -R www-data:www-data storage bootstrap/cache
+chmod -R 775 storage bootstrap/cache
+
+# -------------------------------------------------
+# Optimize Laravel
+# -------------------------------------------------
+echo "⚡ Optimizing Laravel"
+php artisan optimize:clear
+php artisan optimize
+
+# -------------------------------------------------
+# Migrate database
+# -------------------------------------------------
+echo "🗄️ Running migrations"
+php artisan migrate --force || true
+
+# -------------------------------------------------
+# Seed tenants (optional)
+# -------------------------------------------------
+if [ "$RUN_TENANT_SEED" = "true" ]; then
+  echo "🌱 Running tenant seeder"
+  yes | php artisan tenant:seed || true
+fi
+
+echo "✅ Laravel ready"
+exec "$@"
+
+
+
