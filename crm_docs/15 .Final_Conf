@@ -17,7 +17,7 @@ services:
     env_file:
       - .env
     environment:
-      RUN_TENANT_SEED: "true" # enable only once when needed
+      RUN_TENANT_SEED: "false" # enable only once when needed
     depends_on:
       db:
         condition: service_healthy
@@ -63,6 +63,34 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # phpMyAdmin
+  # --------------------------------------------------
+  phpmyadmin:
+    image: phpmyadmin:5.2
+    container_name: saas_crm_ihelp_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+    ports:
+      - "8001:80"
+    depends_on:
+      - db
+    profiles:
+      - debug
+    networks:
+      - saas_crm_ihelp_network
+
+  # --------------------------------------------------
+  # Redis Cache
+  # --------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: saas_crm_ihelp_redis
+    restart: unless-stopped
     networks:
       - saas_crm_ihelp_network
 
