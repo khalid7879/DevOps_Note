@@ -13,3 +13,5 @@ Api server
 kubelet
 pod
 proxy server
+
+https://www.youtube.com/@vishakha.sadhwani
