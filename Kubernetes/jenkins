@@ -1,0 +1,70 @@
+🚀 Step 1: Download Jenkins (Official WAR)
+wget https://get.jenkins.io/war-stable/latest/jenkins.war
+▶️ Step 2: Run Jenkins
+java -jar jenkins.war
+
+You’ll see logs like:
+
+Jenkins is fully up and running
+🌐 Step 3: Access Jenkins
+
+Open browser:
+
+http://<your-server-ip>:8080
+🔐 Step 4: Get Initial Password
+
+In terminal logs OR run:
+
+cat ~/.jenkins/secrets/initialAdminPassword
+🔍 Step 1: Confirm Jenkins is Listening on Port 8080
+
+Run:
+
+ss -tulnp | grep 8080
+
+👉 Expected output:
+
+LISTEN 0 50 0.0.0.0:8080
+❗ If you see:
+127.0.0.1:8080
+
+➡ Jenkins is only accessible locally, not from browser outside
+
+🔧 Step 2: Fix Binding (if needed)
+
+Run Jenkins like this:
+
+java -jar jenkins.war --httpListenAddress=0.0.0.0
+
+This makes it accessible externally.
+
+🌐 Step 3: Use Correct URL
+If on same machine:
+http://localhost:8080
+If on VM / server:
+http://<your-server-ip>:8080
+
+Get IP:
+
+ip a
+
+Look for something like:
+
+inet 192.168.x.x
+🔥 Step 4: Check Firewall (VERY COMMON ISSUE)
+Ubuntu firewall:
+sudo ufw status
+
+If active, allow port:
+
+sudo ufw allow 8080
+☁️ Step 5: If on Cloud (AWS / Azure / GCP)
+
+You MUST open port 8080 in:
+
+Security Group / Firewall rules
+
+Allow:
+
+Port: 8080
+Source: 0.0.0.0/0
