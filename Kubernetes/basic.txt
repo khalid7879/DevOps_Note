@@ -15,3 +15,30 @@ pod
 proxy server
 
 https://www.youtube.com/@vishakha.sadhwani
+
+
+Kubernetes Cheatsheet
+Cluster Info
+kubectl cluster-info
+kubectl get nodes
+Pod Management
+kubectl run my-nginx --image=nginx
+kubectl get pods
+kubectl describe pod my-nginx
+kubectl delete pod my-nginx
+Apply from Manifest
+kubectl apply -f <file>.yaml
+Update Deployment
+kubectl rollout restart deployment <name>
+kubectl describe deployment <name>
+Service & Exposure
+kubectl expose pod my-nginx --type=NodePort --port=80
+kubectl get svc
+kubectl port-forward svc/my-svc 8080:80 --address 0.0.0.0
+Namespace Handling
+kubectl create namespace my-namespace
+kubectl get pods -n my-namespace
+kubectl config set-context --current --namespace=my-namespace
+Logs & Debug
+kubectl logs <pod-name>
+kubectl exec -it <pod-name> -- bash
