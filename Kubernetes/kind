@@ -11,3 +11,69 @@ kind create cluster --image kindest/node:v1.35.0@sha256:452d707d4862f52530247495
 kubectl cluster-info --context kind-kind
 
 https://trilio.io/kubernetes-best-practices/kubectl-cheat-sheet/
+Step 1: Create the Cluster Config
+First, create a file named cluster.yaml. This ensures your laptop can "talk" to the nodes inside Docker.
+
+YAML
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  extraPortMappings:
+  - containerPort: 30001
+    hostPort: 30001
+- role: worker
+- role: worker
+Step 2: Spin up the Cluster
+Run this command to build your three nodes (1 control-plane, 2 workers):
+
+Bash
+kind create cluster --config cluster.yaml
+Wait for the terminal to say "Started cluster".
+
+Step 3: Create the Pods (The Deployment)
+You need an actual application for the Service to talk to. Create a file named deployment.yaml. Notice the labels match your service.
+
+YAML
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      env: demo
+  template:
+    metadata:
+      labels:
+        env: demo
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+Apply it:
+
+Bash
+kubectl apply -f deployment.yaml
+Step 4: Create the Service
+Now, apply your nodeport.yaml file to open the "door" to those pods.
+
+Bash
+kubectl apply -f nodeport.yaml
+Step 5: Verify Everything
+Now we check if the components are talking to each other.
+
+Check Nodes: kubectl get nodes (Should see 3 nodes).
+
+Check Pods: kubectl get pods (Should see 2 pods running).
+
+Check Service: kubectl get svc (Should see nodeport-svc).
+
+Step 6: Access Your App
+Open your web browser on your computer and go to:
+http://localhost:30001
+
+You should see the "Welcome to nginx!" page.
