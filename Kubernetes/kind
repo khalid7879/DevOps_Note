@@ -14,6 +14,14 @@ https://trilio.io/kubernetes-best-practices/kubectl-cheat-sheet/
 Step 1: Create the Cluster Config
 First, create a file named cluster.yaml. This ensures your laptop can "talk" to the nodes inside Docker.
 
+There are 4 types of Services:
+
+ClusterIP(For Internal access)
+NodePort(To access the application on a particular port)
+LoadBalancer(To access the application on a domain name or IP address without using the port number)
+External (To use an external DNS for routing)
+
+
 YAML
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
